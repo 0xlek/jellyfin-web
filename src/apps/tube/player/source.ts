@@ -8,6 +8,8 @@ import { appHost } from 'components/apphost';
 
 export type SubtitleTrack = { index: number, label: string, language?: string, src: string, isDefault: boolean };
 
+export type AudioTrack = { index: number, label: string, language?: string };
+
 export type PlaybackSource = {
     url: string
     isHls: boolean
@@ -15,6 +17,9 @@ export type PlaybackSource = {
     mediaSourceId: string
     playSessionId?: string
     subtitles: SubtitleTrack[]
+    audioTracks: AudioTrack[]
+    /** The audio track this stream plays. */
+    audioStreamIndex?: number
 };
 
 const withApiKey = (api: Api, url: string) => {
@@ -24,16 +29,24 @@ const withApiKey = (api: Api, url: string) => {
     return `${absolute}${separator}ApiKey=${api.accessToken}`;
 };
 
-/** Negotiates a stream with the server using the same device profile as the classic player. */
-export const getPlaybackSource = async (api: Api, userId: string, item: BaseItemDto): Promise<PlaybackSource> => {
+/**
+ * Negotiates a stream with the server using the same device profile as the classic player.
+ * Browsers cannot switch the audio track inside a directly played file, so choosing a track
+ * asks the server for a stream (remuxed when it can) that carries only that track.
+ */
+export const getPlaybackSource = async (api: Api, userId: string, item: BaseItemDto, audioStreamIndex?: number): Promise<PlaybackSource> => {
     const profile: DeviceProfile = await appHost.getDeviceProfile(item);
+    const switchingAudio = audioStreamIndex !== undefined;
     const { data } = await getMediaInfoApi(api).getPostedPlaybackInfo({
         itemId: item.Id!,
         userId,
         playbackInfoDto: {
             UserId: userId,
             DeviceProfile: profile,
-            AutoOpenLiveStream: true
+            AutoOpenLiveStream: true,
+            AudioStreamIndex: audioStreamIndex,
+            EnableDirectPlay: !switchingAudio,
+            EnableDirectStream: !switchingAudio
         }
     });
 
@@ -43,7 +56,7 @@ export const getPlaybackSource = async (api: Api, userId: string, item: BaseItem
 
     let url: string;
     let playMethod: PlayMethod;
-    if (source.SupportsDirectPlay || source.SupportsDirectStream) {
+    if (!switchingAudio && (source.SupportsDirectPlay || source.SupportsDirectStream)) {
         playMethod = source.SupportsDirectPlay ? PlayMethod.DirectPlay : PlayMethod.DirectStream;
         url = api.getUri(`/Videos/${item.Id}/stream.${source.Container}`, {
             Static: true,
@@ -70,8 +83,18 @@ export const getPlaybackSource = async (api: Api, userId: string, item: BaseItem
             isDefault: s.Index === source.DefaultSubtitleStreamIndex
         }));
 
+    const audioTracks = (source.MediaStreams ?? [])
+        .filter(s => s.Type === 'Audio')
+        .map(s => ({
+            index: s.Index ?? -1,
+            label: s.DisplayTitle ?? s.Language ?? `Track ${s.Index}`,
+            language: s.Language ?? undefined
+        }));
+
     return {
         url,
+        audioTracks,
+        audioStreamIndex: audioStreamIndex ?? source.DefaultAudioStreamIndex ?? audioTracks[0]?.index,
         isHls: source.TranscodingSubProtocol === 'hls' || url.includes('.m3u8'),
         playMethod,
         mediaSourceId: source.Id,

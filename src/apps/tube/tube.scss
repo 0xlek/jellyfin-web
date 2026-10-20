@@ -1332,3 +1332,102 @@
         border-radius: 0;
     }
 }
+
+/* Collections (a directory of videos, drawn like a playlist) */
+
+.tb-thumb--stack {
+    margin-top: 8px;
+
+    /* Two thinner cards peeking out above the cover; box-shadow is not clipped by the thumb's overflow */
+    box-shadow:
+        0 -4px 0 -2px #3d3d3d,
+        0 -8px 0 -4px #2a2a2a;
+}
+
+.tb-thumb__badge--count {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tb-thumb__badge-icon {
+    width: 14px;
+    height: 14px;
+}
+
+.tb-card__index {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    flex-shrink: 0;
+    color: var(--tb-text-2);
+    font-size: 12px;
+}
+
+.tb-collection-header {
+    padding-bottom: 16px;
+
+    .tb-actions {
+        margin-top: 12px;
+    }
+}
+
+.tb-upnext__header h2 a:hover {
+    text-decoration: underline;
+}
+
+/* Player settings menu (audio track, subtitles) */
+
+.tb-player__menu-anchor {
+    position: relative;
+}
+
+.tb-player__menu {
+    position: absolute;
+    right: 0;
+    bottom: 52px;
+    z-index: 5;
+    min-width: 240px;
+    max-height: 60vh;
+    padding: 8px 0;
+    overflow-y: auto;
+    border-radius: var(--tb-radius);
+    background: rgba(28, 28, 28, 0.94);
+    color: #fff;
+
+    .tb-player__menu-group + .tb-player__menu-group {
+        margin-top: 4px;
+        padding-top: 4px;
+        border-top: 1px solid var(--tb-border);
+    }
+
+    h4 {
+        padding: 6px 16px;
+        color: var(--tb-text-2);
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .tb-player__menu-item {
+        display: block;
+        width: 100%;
+        padding: 8px 16px 8px 36px;
+        border: 0;
+        background: none;
+        text-align: left;
+        white-space: nowrap;
+
+        &:hover {
+            background: var(--tb-hover);
+        }
+
+        &[aria-checked="true"] {
+            background-image: linear-gradient(var(--tb-accent), var(--tb-accent));
+            background-repeat: no-repeat;
+            background-position: 14px center;
+            background-size: 8px 8px;
+            font-weight: 600;
+        }
+    }
+}

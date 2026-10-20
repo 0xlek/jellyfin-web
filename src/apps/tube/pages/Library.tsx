@@ -10,6 +10,7 @@ import Page from 'components/Page';
 import globalize from 'lib/globalize';
 
 import { type GridFilter, useItem } from '../api';
+import CatalogGrid from '../components/CatalogGrid';
 import Chips from '../components/Chips';
 import VideoGrid from '../components/VideoGrid';
 import { useDocumentTitle } from '../hooks';
@@ -50,17 +51,22 @@ const Library: FC = () => {
         ...(SORTS[sort] ?? SORTS.latest)
     }), [ id, view?.CollectionType, sort ]);
 
+    // Movie and show libraries list their titles; any other library is plain files, grouped by directory
+    const isTitleLibrary = view?.CollectionType === CollectionType.Movies || view?.CollectionType === CollectionType.Tvshows;
+
     return (
         <Page id='tubeLibrary' className='tb-page'>
             <div className='tb-sticky'>
                 <h1 className='tb-page__title'>{view?.Name}</h1>
-                <Chips
-                    chips={chips}
-                    value={sort}
-                    onChange={s => setParams(s === 'latest' ? {} : { sort: s }, { replace: true })}
-                />
+                {isTitleLibrary && (
+                    <Chips
+                        chips={chips}
+                        value={sort}
+                        onChange={s => setParams(s === 'latest' ? {} : { sort: s }, { replace: true })}
+                    />
+                )}
             </div>
-            {view && <VideoGrid filter={filter} />}
+            {view && (isTitleLibrary ? <VideoGrid filter={filter} /> : <CatalogGrid parentId={id} titleTypes={[]} />)}
         </Page>
     );
 };

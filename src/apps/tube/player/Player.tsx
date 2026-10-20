@@ -10,7 +10,7 @@ import { useApi } from 'hooks/useApi';
 import globalize from 'lib/globalize';
 
 import { TUBE_KEY } from '../api';
-import { isTyping, useStoredState } from '../hooks';
+import { isTyping, useDismiss, useStoredState } from '../hooks';
 import Icon from '../icons';
 import { formatClock, secondsToTicks, ticksToSeconds } from '../utils';
 import { getPlaybackSource, type PlaybackSource } from './source';
@@ -46,7 +46,16 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
     const [ scrubbing, setScrubbing ] = useState(false);
     const [ idle, setIdle ] = useState(false);
     const [ fullscreen, setFullscreen ] = useState(false);
-    const [ captions, setCaptions ] = useState(false);
+    /** Index into source.subtitles, or -1 for off. */
+    const [ subtitle, setSubtitle ] = useState(-1);
+    /** Chosen audio stream; undefined plays the file's default track as-is. */
+    const [ audioIndex, setAudioIndex ] = useState<number>();
+    const [ menuOpen, setMenuOpen ] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+    // Switching audio reloads the stream; it continues from here instead of the resume point
+    const restartAt = useRef<number>();
+    const closeMenu = useCallback(() => setMenuOpen(false), []);
+    useDismiss(menuRef, menuOpen, closeMenu);
     const [ volume, setVolume ] = useStoredState('tube-volume', '1');
     const [ muted, setMuted ] = useStoredState('tube-muted', 'false');
 
@@ -61,9 +70,12 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
         let progressTimer: number | undefined;
         let current: PlaybackSource | undefined;
 
+        const from = restartAt.current ?? startSeconds;
+        restartAt.current = undefined;
+
         setError(undefined);
         setWaiting(true);
-        setTime(startSeconds ?? 0);
+        setTime(from ?? 0);
 
         const sessions = getSessionApi(api);
         const info = () => ({
@@ -91,11 +103,11 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
         video.addEventListener('seeked', reportProgress);
 
         const start = () => {
-            if (startSeconds) video.currentTime = startSeconds;
+            if (from) video.currentTime = from;
             video.play().catch(() => setWaiting(false));
         };
 
-        getPlaybackSource(api, user.Id, item)
+        getPlaybackSource(api, user.Id, item, audioIndex)
             .then(async result => {
                 if (cancelled) return;
                 current = result;
@@ -105,7 +117,7 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
                 if (result.isHls && !video.canPlayType('application/vnd.apple.mpegurl')) {
                     const { default: HlsJs } = await import(/* webpackChunkName: "hlsjs" */ 'hls.js');
                     if (cancelled) return;
-                    hls = new HlsJs({ startPosition: startSeconds ?? -1 });
+                    hls = new HlsJs({ startPosition: from ?? -1 });
                     hls.on(HlsJs.Events.ERROR, (_e, data) => {
                         if (data.fatal) setError(`Stream error: ${data.details}`);
                     });
@@ -138,9 +150,9 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
             video.load();
             setSource(undefined);
         };
-    // The stream is negotiated once per item; a new start time without a new item is a seek, not a reload.
+    // The stream is negotiated once per item and audio track; a new start time alone is a seek, not a reload.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ api, user?.Id, item.Id ]);
+    }, [ api, user?.Id, item.Id, audioIndex ]);
 
     useEffect(() => {
         const video = videoRef.current;
@@ -152,10 +164,27 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
-        for (const track of Array.from(video.textTracks)) {
-            track.mode = captions && track === video.textTracks[0] ? 'showing' : 'hidden';
+        Array.from(video.textTracks).forEach((track, i) => {
+            track.mode = i === subtitle ? 'showing' : 'hidden';
+        });
+    }, [ subtitle, source ]);
+
+    const chooseAudio = (index: number) => {
+        setMenuOpen(false);
+        if (index === source?.audioStreamIndex) return;
+        restartAt.current = videoRef.current?.currentTime;
+        setAudioIndex(index);
+    };
+
+    // c toggles subtitles: back to the last chosen track, or the first one
+    const lastSubtitle = useRef(0);
+    const toggleSubtitles = useCallback(() => setSubtitle(current => {
+        if (current >= 0) {
+            lastSubtitle.current = current;
+            return -1;
         }
-    }, [ captions, source ]);
+        return lastSubtitle.current;
+    }), []);
 
     useEffect(() => {
         if (!Screenfull.isEnabled) return;
@@ -206,7 +235,7 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
             f: toggleFullscreen,
             m: toggleMute,
             t: onToggleTheater,
-            c: () => setCaptions(on => !on)
+            c: toggleSubtitles
         };
         const whenFocused: Record<string, () => void> = {
             ' ': togglePlay,
@@ -235,7 +264,7 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
         };
         document.addEventListener('keydown', onKey);
         return () => document.removeEventListener('keydown', onKey);
-    }, [ togglePlay, seekBy, seekTo, toggleFullscreen, toggleMute, onToggleTheater, onNext, setVolume, wake ]);
+    }, [ togglePlay, seekBy, seekTo, toggleFullscreen, toggleMute, onToggleTheater, onNext, setVolume, wake, toggleSubtitles ]);
 
     const fractionAt = (clientX: number) => {
         const rect = barRef.current!.getBoundingClientRect();
@@ -265,7 +294,7 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
         if (video.buffered.length) setBuffered(video.buffered.end(video.buffered.length - 1));
     };
 
-    const showControls = !playing || !idle || scrubbing;
+    const showControls = !playing || !idle || scrubbing || menuOpen;
     const isMuted = muted === 'true' || Number(volume) === 0;
     const played = duration ? (time / duration) * 100 : 0;
 
@@ -362,13 +391,57 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
                     <span className='tb-controls__spacer' />
                     {!!source?.subtitles.length && (
                         <button
-                            className={classNames('tb-ctl', { 'is-on': captions })}
+                            className={classNames('tb-ctl', { 'is-on': subtitle >= 0 })}
                             aria-label={`${globalize.translate('Subtitles')} (c)`}
-                            aria-pressed={captions}
-                            onClick={() => setCaptions(c => !c)}
+                            aria-pressed={subtitle >= 0}
+                            onClick={toggleSubtitles}
                         >
                             <Icon name='cc' />
                         </button>
+                    )}
+                    {(source && (source.audioTracks.length > 1 || source.subtitles.length > 0)) && (
+                        <div ref={menuRef} className='tb-player__menu-anchor'>
+                            <button
+                                className={classNames('tb-ctl', { 'is-on': menuOpen })}
+                                aria-label='Settings'
+                                aria-haspopup='menu'
+                                aria-expanded={menuOpen}
+                                onClick={() => setMenuOpen(o => !o)}
+                            >
+                                <Icon name='gear' />
+                            </button>
+                            {menuOpen && (
+                                <div className='tb-player__menu' role='menu'>
+                                    {source.audioTracks.length > 1 && (
+                                        <section className='tb-player__menu-group'>
+                                            <h4>Audio</h4>
+                                            {source.audioTracks.map(track => (
+                                                <button
+                                                    key={track.index}
+                                                    className='tb-player__menu-item'
+                                                    role='menuitemradio'
+                                                    aria-checked={track.index === source.audioStreamIndex}
+                                                    onClick={() => chooseAudio(track.index)}
+                                                >
+                                                    {track.label}
+                                                </button>
+                                            ))}
+                                        </section>
+                                    )}
+                                    {source.subtitles.length > 0 && (
+                                        <section className='tb-player__menu-group'>
+                                            <h4>{globalize.translate('Subtitles')}</h4>
+                                            <button className='tb-player__menu-item' role='menuitemradio' aria-checked={subtitle < 0} onClick={() => setSubtitle(-1)}>Off</button>
+                                            {source.subtitles.map((track, i) => (
+                                                <button key={track.index} className='tb-player__menu-item' role='menuitemradio' aria-checked={subtitle === i} onClick={() => setSubtitle(i)}>
+                                                    {track.label}
+                                                </button>
+                                            ))}
+                                        </section>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     )}
                     {!fullscreen && (
                         <button className='tb-ctl' aria-label={theater ? 'Default view (t)' : 'Theater mode (t)'} onClick={onToggleTheater}>

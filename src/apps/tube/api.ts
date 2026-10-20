@@ -14,6 +14,8 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 
 import { useApi } from 'hooks/useApi';
 
+import { buildCatalog } from './catalog';
+
 /** Every query of this app lives under this key, so playback can refresh them all at once. */
 export const TUBE_KEY = 'Tube';
 
@@ -262,5 +264,77 @@ export const useTogglePlayed = () => {
             return on ? userData.markPlayedItem(params) : userData.markUnplayedItem(params);
         },
         onSettled: () => queryClient.invalidateQueries({ queryKey: [ TUBE_KEY ] })
+    });
+};
+
+/**
+ * Home and library grid: movies and series as they are, plain videos grouped into one collection
+ * per directory (see buildCatalog).
+ */
+export const useCatalog = (parentId?: string, titleTypes: BaseItemKind[] = [ BaseItemKind.Movie, BaseItemKind.Series ]) => {
+    const { api, user } = useApi();
+    return useQuery({
+        queryKey: [ TUBE_KEY, 'Catalog', user?.Id, parentId, titleTypes ],
+        queryFn: async ({ signal }) => {
+            const library = getLibraryApi(api!);
+            const common = { userId: user?.Id, parentId, recursive: true, enableTotalRecordCount: false };
+            const [ titles, videos, folders ] = await Promise.all([
+                titleTypes.length ?
+                    library.getItems({ ...common, includeItemTypes: titleTypes, fields: CARD_FIELDS, enableUserData: true, imageTypeLimit: 1 }, { signal }) :
+                    Promise.resolve({ data: { Items: [] } }),
+                library.getItems({
+                    ...common,
+                    includeItemTypes: [ BaseItemKind.Video ],
+                    fields: [ ...CARD_FIELDS, ItemFields.ParentId ],
+                    sortBy: [ ItemSortBy.SortName ],
+                    enableUserData: true,
+                    imageTypeLimit: 1
+                }, { signal }),
+                library.getItems({ ...common, includeItemTypes: [ BaseItemKind.Folder ], fields: [ ItemFields.ParentId ], enableImages: false }, { signal })
+            ]);
+            return buildCatalog(videos.data.Items ?? [], folders.data.Items ?? [], titles.data.Items ?? []);
+        },
+        enabled: !!api && !!user?.Id
+    });
+};
+
+/** A directory's own videos in name order (Jellyfin sorts numbers naturally: 2 before 10). */
+export const useCollectionVideos = (folderId?: string) => {
+    const { api, user } = useApi();
+    return useQuery({
+        queryKey: [ TUBE_KEY, 'CollectionVideos', user?.Id, folderId ],
+        queryFn: async ({ signal }) => {
+            const { data } = await getLibraryApi(api!).getItems({
+                userId: user?.Id,
+                parentId: folderId,
+                includeItemTypes: [ BaseItemKind.Video ],
+                sortBy: [ ItemSortBy.SortName ],
+                sortOrder: [ SortOrder.Ascending ],
+                fields: CARD_FIELDS,
+                enableUserData: true
+            }, { signal });
+            return data.Items ?? [];
+        },
+        enabled: !!api && !!user?.Id && !!folderId
+    });
+};
+
+export type CollectionInfo = { folder: BaseItemDto, subtitle?: string };
+
+/**
+ * The collection a video belongs to: its directory, unless the video sits at a library root
+ * (then the nearest ancestor is the library itself and there is no collection).
+ */
+export const useCollectionOf = (item?: BaseItemDto) => {
+    const { api, user } = useApi();
+    return useQuery({
+        queryKey: [ TUBE_KEY, 'CollectionOf', user?.Id, item?.Id ],
+        queryFn: async ({ signal }): Promise<CollectionInfo | null> => {
+            const { data: ancestors } = await getLibraryApi(api!).getAncestors({ itemId: item!.Id!, userId: user?.Id }, { signal });
+            const [ parent, grandparent ] = ancestors;
+            if (parent?.Type !== BaseItemKind.Folder) return null;
+            return { folder: parent, subtitle: grandparent?.Type === BaseItemKind.Folder ? grandparent.Name ?? undefined : undefined };
+        },
+        enabled: !!api && !!user?.Id && item?.Type === BaseItemKind.Video
     });
 };

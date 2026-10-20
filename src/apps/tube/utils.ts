@@ -38,6 +38,8 @@ const isPlayable = (item: BaseItemDto) =>
 export const itemLink = (item: BaseItemDto) => {
     if (isPlayable(item)) return `/watch?v=${item.Id}`;
     if (item.Type === BaseItemKind.Series) return `/series/${item.Id}`;
+    if (item.Type === BaseItemKind.Season && item.SeriesId) return `/series/${item.SeriesId}?season=${item.Id}`;
+    if (item.Type === BaseItemKind.Folder) return `/collection/${item.Id}`;
     if (item.Type === BaseItemKind.CollectionFolder || item.Type === BaseItemKind.UserView) return `/library/${item.Id}`;
     // Not ported yet: fall back to the classic details page
     return `/details?id=${item.Id}&serverId=${item.ServerId}`;

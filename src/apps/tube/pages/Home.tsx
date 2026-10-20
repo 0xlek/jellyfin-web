@@ -7,6 +7,7 @@ import Page from 'components/Page';
 import globalize from 'lib/globalize';
 
 import { type GridFilter, useGenres, useNextUp, useResumeItems } from '../api';
+import CatalogGrid from '../components/CatalogGrid';
 import Chips from '../components/Chips';
 import VideoGrid, { Shelf } from '../components/VideoGrid';
 import { useDocumentTitle } from '../hooks';
@@ -55,7 +56,7 @@ const Home: FC = () => {
                     <Shelf title={globalize.translate('NextUp')} items={nextUp} />
                 </>
             )}
-            <VideoGrid filter={filter} />
+            {chip === 'all' ? <CatalogGrid /> : <VideoGrid filter={filter} />}
         </Page>
     );
 };

@@ -5,7 +5,7 @@ import ConnectionRequired from 'components/ConnectionRequired';
 import ErrorBoundary from 'components/router/ErrorBoundary';
 
 /** Top-level paths owned by this app; the root layout hides the legacy header on them. */
-export const TUBE_PATHS = [ 'home', 'watch', 'results', 'library', 'series', 'feed' ];
+export const TUBE_PATHS = [ 'home', 'watch', 'results', 'library', 'series', 'feed', 'collection', 'details' ];
 
 const page = (load: () => Promise<{ default: ComponentType }>) => async () => ({ Component: (await load()).default });
 
@@ -22,7 +22,9 @@ export const TUBE_ROUTES: RouteObject[] = [
                     { path: 'results', lazy: page(() => import('./pages/Results')) },
                     { path: 'library/:id', lazy: page(() => import('./pages/Library')) },
                     { path: 'series/:id', lazy: page(() => import('./pages/Series')) },
-                    { path: 'feed/:kind', lazy: page(() => import('./pages/Feed')) }
+                    { path: 'feed/:kind', lazy: page(() => import('./pages/Feed')) },
+                    { path: 'collection/:id', lazy: page(() => import('./pages/Collection')) },
+                    { path: 'details', lazy: page(() => import('./pages/Details')) }
                 ]
             }
         ]

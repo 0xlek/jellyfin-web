@@ -14,6 +14,10 @@ type VideoCardProps = {
     compact?: boolean
     wide?: boolean
     current?: boolean
+    /** Overrides the default destination, e.g. to keep a collection as the playlist. */
+    to?: string
+    /** Position in a playlist, shown before the thumbnail. */
+    index?: number
 };
 
 const Thumb: FC<{ item: BaseItemDto }> = ({ item }) => {
@@ -42,7 +46,7 @@ const Thumb: FC<{ item: BaseItemDto }> = ({ item }) => {
     );
 };
 
-const VideoCard: FC<VideoCardProps> = ({ item, compact = false, wide = false, current = false }) => {
+const VideoCard: FC<VideoCardProps> = ({ item, compact = false, wide = false, current = false, to, index }) => {
     const { api } = useApi();
     const avatar = !compact && avatarUrl(api, item);
     const channel = channelName(item);
@@ -50,10 +54,11 @@ const VideoCard: FC<VideoCardProps> = ({ item, compact = false, wide = false, cu
 
     return (
         <Link
-            to={itemLink(item)}
+            to={to ?? itemLink(item)}
             className={classNames('tb-card', { 'tb-card--compact': compact, 'tb-card--wide': wide, 'is-current': current })}
             aria-current={current ? 'page' : undefined}
         >
+            {index !== undefined && <span className='tb-card__index'>{current ? '▶' : index}</span>}
             <Thumb item={item} />
             <div className='tb-card__details'>
                 {avatar && <img className='tb-card__avatar' src={avatar} alt='' loading='lazy' />}

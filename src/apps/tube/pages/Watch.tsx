@@ -8,7 +8,7 @@ import Page from 'components/Page';
 import { useApi } from 'hooks/useApi';
 import globalize from 'lib/globalize';
 
-import { useItem, useToggleFavorite, useTogglePlayed, useUpNext } from '../api';
+import { type CollectionInfo, useCollectionOf, useCollectionVideos, useItem, useToggleFavorite, useTogglePlayed, useUpNext } from '../api';
 import VideoCard from '../components/VideoCard';
 import { useDocumentTitle, useStoredState } from '../hooks';
 import Icon from '../icons';
@@ -79,12 +79,19 @@ const Actions: FC<{ item: BaseItemDto }> = ({ item }) => {
             <button className='tb-pill' onClick={share}>
                 <Icon name='share' />{copied ? 'Copied' : globalize.translate('Share')}
             </button>
-            <Link className='tb-pill' to={`/details?id=${item.Id}&serverId=${item.ServerId}`} title='Open in classic view'>
-                <Icon name='more' />{globalize.translate('ButtonMore')}
-            </Link>
         </div>
     );
 };
+
+const CollectionChannel: FC<{ info: CollectionInfo }> = ({ info }) => (
+    <Link to={`/collection/${info.folder.Id}`} className='tb-channel'>
+        <span className='tb-channel__fallback'><Icon name='playlist' /></span>
+        <span className='tb-channel__text'>
+            <strong>{info.folder.Name}</strong>
+            {info.subtitle && <span className='tb-muted'>{info.subtitle}</span>}
+        </span>
+    </Link>
+);
 
 const Channel: FC<{ item: BaseItemDto }> = ({ item }) => {
     const { api } = useApi();
@@ -107,7 +114,11 @@ const Watch: FC = () => {
     const id = params.get('v') ?? undefined;
     const t = Number(params.get('t')) || undefined;
     const { data: item, error } = useItem(id);
-    const { data: upNext } = useUpNext(item);
+    // A video inside a directory plays that directory as its playlist
+    const { data: collectionOf } = useCollectionOf(item);
+    const listId = params.get('list') ?? collectionOf?.folder.Id;
+    const { data: playlist } = useCollectionVideos(listId ?? undefined);
+    const { data: upNext } = useUpNext(playlist ? undefined : item);
     const [ theater, setTheater ] = useStoredState('tube-theater', 'false');
     const [ autoplay, setAutoplay ] = useStoredState('tube-autoplay', 'true');
 
@@ -115,11 +126,13 @@ const Watch: FC = () => {
 
     // Resume where the server says we left off, unless the URL pins a time
     const resumeAt = t ?? (item?.UserData?.PlaybackPositionTicks ? ticksToSeconds(item.UserData.PlaybackPositionTicks) : undefined);
-    const next = upNext?.[0];
+    const position = playlist?.findIndex(v => v.Id === id) ?? -1;
+    const next = playlist ? playlist[position + 1] : upNext?.[0];
+    const linkTo = useCallback((video: BaseItemDto) => (playlist ? `/watch?v=${video.Id}&list=${listId}` : itemLink(video)), [ playlist, listId ]);
 
     const goNext = useCallback(() => {
-        if (next) navigate(itemLink(next));
-    }, [ next, navigate ]);
+        if (next) navigate(linkTo(next));
+    }, [ next, navigate, linkTo ]);
 
     const onEnded = useCallback(() => {
         if (autoplay === 'true') goNext();
@@ -154,7 +167,7 @@ const Watch: FC = () => {
                         <>
                             <h1 className='tb-watch__title'>{item.Name}</h1>
                             <div className='tb-watch__bar'>
-                                <Channel item={item} />
+                                {collectionOf ? <CollectionChannel info={collectionOf} /> : <Channel item={item} />}
                                 <Actions item={item} />
                             </div>
                             <Description item={item} />
@@ -163,7 +176,14 @@ const Watch: FC = () => {
                 </div>
                 <aside className='tb-watch__secondary'>
                     <div className='tb-upnext__header'>
-                        <h2>{item?.Type === BaseItemKind.Episode ? 'Up next' : globalize.translate('HeaderMoreLikeThis')}</h2>
+                        {playlist ? (
+                            <h2>
+                                <Link to={`/collection/${listId}`}>{collectionOf?.folder.Name ?? 'Playlist'}</Link>
+                                <span className='tb-muted'> · {position + 1} / {playlist.length}</span>
+                            </h2>
+                        ) : (
+                            <h2>{item?.Type === BaseItemKind.Episode ? 'Up next' : globalize.translate('HeaderMoreLikeThis')}</h2>
+                        )}
                         <label className='tb-toggle'>
                             <span>Autoplay</span>
                             <input
@@ -174,7 +194,11 @@ const Watch: FC = () => {
                         </label>
                     </div>
                     <div className='tb-list'>
-                        {upNext?.map(i => <VideoCard key={i.Id} item={i} compact />)}
+                        {playlist ?
+                            playlist.map((video, i) => (
+                                <VideoCard key={video.Id} item={video} to={linkTo(video)} index={i + 1} current={video.Id === id} compact />
+                            )) :
+                            upNext?.map(i => <VideoCard key={i.Id} item={i} compact />)}
                     </div>
                 </aside>
             </div>
