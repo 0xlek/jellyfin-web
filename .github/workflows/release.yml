@@ -74,7 +74,7 @@ jobs:
             docker tag "$CANDIDATE" "$image:$tag"
             docker push "$image:$tag"
           done
-          ref=$(docker inspect --format '{{index .RepoDigests 0}}' "$image:$version")
+          ref=$(docker inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$image:$version" | grep "^$image@")
           echo "IMAGE_REF=$ref" >> "$GITHUB_ENV"
           echo "- \`$ref\`" >> "$GITHUB_STEP_SUMMARY"
 
