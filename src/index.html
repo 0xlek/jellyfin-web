@@ -2,6 +2,15 @@
 <html dir="ltr">
 <head>
     <meta charset="utf-8">
+    <script>
+        // The router uses real paths (e.g. /web/series/<id>), so relative assets must resolve from the app root, not the current path
+        (function () {
+            var match = window.location.pathname.match(/^(.*?\/web)(\/|$)/);
+            var base = document.createElement('base');
+            base.href = match ? match[1] + '/' : '/';
+            document.head.appendChild(base);
+        })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <link rel="manifest" href="manifest.json">
     <meta name="format-detection" content="telephone=no">
@@ -90,5 +99,6 @@
     <div id="reactRoot">
         <div class="splashLogo"></div>
     </div>
+    <script type="module" src="./index.jsx"></script>
 </body>
 </html>

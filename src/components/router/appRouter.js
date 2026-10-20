@@ -42,13 +42,8 @@ class AppRouter {
         this.lastPath = history.location.pathname + history.location.search;
         this.listen();
 
-        // TODO: Can this baseRoute logic be simplified?
-        this.baseRoute = window.location.href.split('?')[0].replace(this.#getRequestFile(), '');
-        // support hashbang
-        this.baseRoute = this.baseRoute.split('#')[0];
-        if (this.baseRoute.endsWith('/') && !this.baseRoute.endsWith('://')) {
-            this.baseRoute = this.baseRoute.substring(0, this.baseRoute.length - 1);
-        }
+        // index.html sets <base> to the app root, so it is the base route regardless of the current path
+        this.baseRoute = document.baseURI.split(/[?#]/)[0].replace(/\/$/, '');
     }
 
     ready() {
@@ -206,23 +201,6 @@ class AppRouter {
                 appRouter.showLocalLogin(apiClient.serverId());
             }
         }
-    }
-
-    #getRequestFile() {
-        let path = window.location.pathname || '';
-
-        const index = path.lastIndexOf('/');
-        if (index !== -1) {
-            path = path.substring(index);
-        } else {
-            path = '/' + path;
-        }
-
-        if (!path || path === '/') {
-            path = '/index.html';
-        }
-
-        return path;
     }
 
     getRouteUrl(item, options) {

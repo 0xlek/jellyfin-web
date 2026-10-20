@@ -1,4 +1,3 @@
-import 'jquery';
 import loading from '../loading/loading';
 import globalize from '../../lib/globalize';
 import '../../elements/emby-checkbox/emby-checkbox';
@@ -111,9 +110,11 @@ export default function (page, providerId, options) {
 
                 return 0;
             });
-            $('#selectCountry', page).html(countryList.map(function (c) {
+            const selectCountry = page.querySelector('#selectCountry');
+            selectCountry.innerHTML = countryList.map(function (c) {
                 return '<option value="' + c.value + '">' + c.name + '</option>';
-            }).join('')).val(info.Country || '');
+            }).join('');
+            selectCountry.value = info.Country || '';
             page.querySelector('.txtZipCode').dispatchEvent(new Event('change'));
         }, function () { // ApiClient.getJSON() error handler
             Dashboard.alert({
@@ -176,7 +177,7 @@ export default function (page, providerId, options) {
             info.Country = page.querySelector('#selectCountry').value;
             info.ListingsId = selectedListingsId;
             info.EnableAllTuners = page.querySelector('.chkAllTuners').checked;
-            info.EnabledTuners = info.EnableAllTuners ? [] : $('.chkTuner', page).get().filter(function (i) {
+            info.EnabledTuners = info.EnableAllTuners ? [] : Array.from(page.querySelectorAll('.chkTuner')).filter(function (i) {
                 return i.checked;
             }).map(function (i) {
                 return i.getAttribute('data-id');
@@ -277,7 +278,7 @@ export default function (page, providerId, options) {
                 page.querySelector('.selectTunersSection').classList.remove('hide');
             }
         });
-        $('.createAccountHelp', page).html(globalize.translate('MessageCreateAccountAt', '<a is="emby-linkbutton" class="button-link" href="http://www.schedulesdirect.org" target="_blank">http://www.schedulesdirect.org</a>'));
+        page.querySelector('.createAccountHelp').innerHTML = globalize.translate('MessageCreateAccountAt', '<a is="emby-linkbutton" class="button-link" href="http://www.schedulesdirect.org" target="_blank">http://www.schedulesdirect.org</a>');
         reload();
     };
 }

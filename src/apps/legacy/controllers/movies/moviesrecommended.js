@@ -19,6 +19,9 @@ import 'elements/emby-scroller/emby-scroller';
 import 'elements/emby-itemscontainer/emby-itemscontainer';
 import 'elements/emby-tabs/emby-tabs';
 import 'elements/emby-button/emby-button';
+import { importFromGlob } from 'utils/globImport';
+
+const TAB_CONTROLLERS = import.meta.glob([ './*.js', '!./*.test.js' ]);
 
 function enableScrollX() {
     return !layoutManager.desktop;
@@ -295,7 +298,7 @@ export default function (view, params) {
                 break;
         }
 
-        import(`../movies/${depends}`).then(({ default: ControllerFactory }) => {
+        importFromGlob(TAB_CONTROLLERS, './', depends).then(({ default: ControllerFactory }) => {
             let tabContent;
 
             if (index === suggestionsTabIndex) {

@@ -19,6 +19,9 @@ import 'elements/emby-button/emby-button';
 
 import 'styles/flexstyles.scss';
 import 'styles/scrollstyles.scss';
+import { importFromGlob } from 'utils/globImport';
+
+const TAB_CONTROLLERS = import.meta.glob([ './*.js', '!./*.test.js' ]);
 
 function itemsPerRow() {
     const screenWidth = dom.getWindowSize().innerWidth;
@@ -296,7 +299,7 @@ export default function (view, params) {
                 break;
         }
 
-        import(`../music/${depends}`).then(({ default: ControllerFactory }) => {
+        importFromGlob(TAB_CONTROLLERS, './', depends).then(({ default: ControllerFactory }) => {
             let tabContent;
 
             if (index == 1) {

@@ -1,0 +1,387 @@
+import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
+import { getSessionApi } from '@jellyfin/sdk/lib/utils/api/session-api';
+import { useQueryClient } from '@tanstack/react-query';
+import classNames from 'classnames';
+import type Hls from 'hls.js';
+import Screenfull from 'screenfull';
+import React, { type FC, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react';
+
+import { useApi } from 'hooks/useApi';
+import globalize from 'lib/globalize';
+
+import { TUBE_KEY } from '../api';
+import { isTyping, useStoredState } from '../hooks';
+import Icon from '../icons';
+import { formatClock, secondsToTicks, ticksToSeconds } from '../utils';
+import { getPlaybackSource, type PlaybackSource } from './source';
+
+const PROGRESS_INTERVAL_MS = 10_000;
+const IDLE_HIDE_MS = 2500;
+
+type PlayerProps = {
+    item: BaseItemDto
+    startSeconds?: number
+    theater: boolean
+    onToggleTheater: () => void
+    onEnded: () => void
+    onNext?: () => void
+};
+
+const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater, onEnded, onNext }) => {
+    const { api, user } = useApi();
+    const queryClient = useQueryClient();
+    const rootRef = useRef<HTMLDivElement>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const barRef = useRef<HTMLDivElement>(null);
+    const idleTimer = useRef<number>();
+
+    const [ source, setSource ] = useState<PlaybackSource>();
+    const [ error, setError ] = useState<string>();
+    const [ playing, setPlaying ] = useState(false);
+    const [ waiting, setWaiting ] = useState(true);
+    const [ time, setTime ] = useState(0);
+    const [ duration, setDuration ] = useState(ticksToSeconds(item.RunTimeTicks));
+    const [ buffered, setBuffered ] = useState(0);
+    const [ hover, setHover ] = useState<number>();
+    const [ scrubbing, setScrubbing ] = useState(false);
+    const [ idle, setIdle ] = useState(false);
+    const [ fullscreen, setFullscreen ] = useState(false);
+    const [ captions, setCaptions ] = useState(false);
+    const [ volume, setVolume ] = useStoredState('tube-volume', '1');
+    const [ muted, setMuted ] = useStoredState('tube-muted', 'false');
+
+    // Negotiate the stream, attach it, and report the session to the server.
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!api || !user?.Id || !item.Id || !video) return;
+
+        let cancelled = false;
+        let hls: Hls | undefined;
+        let started = false;
+        let progressTimer: number | undefined;
+        let current: PlaybackSource | undefined;
+
+        setError(undefined);
+        setWaiting(true);
+        setTime(startSeconds ?? 0);
+
+        const sessions = getSessionApi(api);
+        const info = () => ({
+            ItemId: item.Id!,
+            MediaSourceId: current?.mediaSourceId,
+            PlaySessionId: current?.playSessionId,
+            PositionTicks: secondsToTicks(video.currentTime),
+            IsPaused: video.paused,
+            IsMuted: video.muted,
+            VolumeLevel: Math.round(video.volume * 100),
+            PlayMethod: current?.playMethod,
+            CanSeek: true
+        });
+        const reportProgress = () => {
+            if (started) void sessions.reportPlaybackProgress({ playbackProgressInfo: info() }).catch(() => undefined);
+        };
+        const onPlaying = () => {
+            if (started) return reportProgress();
+            started = true;
+            void sessions.reportPlaybackStart({ playbackStartInfo: info() }).catch(() => undefined);
+            progressTimer = window.setInterval(reportProgress, PROGRESS_INTERVAL_MS);
+        };
+        video.addEventListener('playing', onPlaying);
+        video.addEventListener('pause', reportProgress);
+        video.addEventListener('seeked', reportProgress);
+
+        const start = () => {
+            if (startSeconds) video.currentTime = startSeconds;
+            video.play().catch(() => setWaiting(false));
+        };
+
+        getPlaybackSource(api, user.Id, item)
+            .then(async result => {
+                if (cancelled) return;
+                current = result;
+                setSource(result);
+                video.addEventListener('loadedmetadata', start, { once: true });
+
+                if (result.isHls && !video.canPlayType('application/vnd.apple.mpegurl')) {
+                    const { default: HlsJs } = await import(/* webpackChunkName: "hlsjs" */ 'hls.js');
+                    if (cancelled) return;
+                    hls = new HlsJs({ startPosition: startSeconds ?? -1 });
+                    hls.on(HlsJs.Events.ERROR, (_e, data) => {
+                        if (data.fatal) setError(`Stream error: ${data.details}`);
+                    });
+                    hls.loadSource(result.url);
+                    hls.attachMedia(video);
+                } else {
+                    video.src = result.url;
+                }
+            })
+            .catch((err: Error) => {
+                if (!cancelled) setError(err.message);
+            });
+
+        return () => {
+            cancelled = true;
+            window.clearInterval(progressTimer);
+            video.removeEventListener('playing', onPlaying);
+            video.removeEventListener('pause', reportProgress);
+            video.removeEventListener('seeked', reportProgress);
+            video.removeEventListener('loadedmetadata', start);
+            if (started) {
+                const stopInfo = { ItemId: item.Id!, MediaSourceId: current?.mediaSourceId, PlaySessionId: current?.playSessionId, PositionTicks: secondsToTicks(video.currentTime) };
+                void sessions.reportPlaybackStopped({ playbackStopInfo: stopInfo })
+                    .catch(() => undefined)
+                    .finally(() => queryClient.invalidateQueries({ queryKey: [ TUBE_KEY ] }));
+            }
+            hls?.destroy();
+            video.pause();
+            video.removeAttribute('src');
+            video.load();
+            setSource(undefined);
+        };
+    // The stream is negotiated once per item; a new start time without a new item is a seek, not a reload.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ api, user?.Id, item.Id ]);
+
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        video.volume = Number(volume);
+        video.muted = muted === 'true';
+    }, [ volume, muted, source ]);
+
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        for (const track of Array.from(video.textTracks)) {
+            track.mode = captions && track === video.textTracks[0] ? 'showing' : 'hidden';
+        }
+    }, [ captions, source ]);
+
+    useEffect(() => {
+        if (!Screenfull.isEnabled) return;
+        const onChange = () => setFullscreen(!!rootRef.current?.isSameNode(Screenfull.element ?? null));
+        Screenfull.on('change', onChange);
+        return () => Screenfull.off('change', onChange);
+    }, []);
+
+    const togglePlay = useCallback(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        if (video.paused) void video.play().catch(() => undefined);
+        else video.pause();
+    }, []);
+
+    const seekBy = useCallback((delta: number) => {
+        const video = videoRef.current;
+        if (video) video.currentTime = Math.min(Math.max(video.currentTime + delta, 0), video.duration || Infinity);
+    }, []);
+
+    const seekTo = useCallback((seconds: number) => {
+        const video = videoRef.current;
+        if (video) video.currentTime = seconds;
+        setTime(seconds);
+    }, []);
+
+    const toggleFullscreen = useCallback(() => {
+        if (Screenfull.isEnabled && rootRef.current) void Screenfull.toggle(rootRef.current);
+    }, []);
+
+    const toggleMute = useCallback(() => setMuted(m => (m === 'true' ? 'false' : 'true')), [ setMuted ]);
+
+    const wake = useCallback(() => {
+        setIdle(false);
+        window.clearTimeout(idleTimer.current);
+        idleTimer.current = window.setTimeout(() => setIdle(true), IDLE_HIDE_MS);
+    }, []);
+
+    useEffect(() => () => window.clearTimeout(idleTimer.current), []);
+
+    // YouTube's keyboard shortcuts. Arrow keys and space only act while the player has focus so they keep scrolling the page.
+    useEffect(() => {
+        const nudgeVolume = (delta: number) => setVolume(v => String(Math.min(1, Math.max(0, Number(v) + delta))));
+        const anywhere: Record<string, () => void> = {
+            k: togglePlay,
+            j: () => seekBy(-10),
+            l: () => seekBy(10),
+            f: toggleFullscreen,
+            m: toggleMute,
+            t: onToggleTheater,
+            c: () => setCaptions(on => !on)
+        };
+        const whenFocused: Record<string, () => void> = {
+            ' ': togglePlay,
+            arrowleft: () => seekBy(-5),
+            arrowright: () => seekBy(5),
+            arrowup: () => nudgeVolume(0.05),
+            arrowdown: () => nudgeVolume(-0.05)
+        };
+
+        const actionFor = (e: KeyboardEvent) => {
+            const key = e.key.toLowerCase();
+            const length = videoRef.current?.duration;
+            if (e.shiftKey && key === 'n') return onNext;
+            if (/^\d$/.test(key) && length) return () => seekTo(length * Number(key) / 10);
+            if (rootRef.current?.contains(document.activeElement) && whenFocused[key]) return whenFocused[key];
+            return anywhere[key];
+        };
+
+        const onKey = (e: KeyboardEvent) => {
+            if (isTyping(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+            const action = actionFor(e);
+            if (!action) return;
+            e.preventDefault();
+            action();
+            wake();
+        };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [ togglePlay, seekBy, seekTo, toggleFullscreen, toggleMute, onToggleTheater, onNext, setVolume, wake ]);
+
+    const fractionAt = (clientX: number) => {
+        const rect = barRef.current!.getBoundingClientRect();
+        return Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
+    };
+
+    const onBarPointerDown = (e: ReactPointerEvent) => {
+        barRef.current?.setPointerCapture(e.pointerId);
+        setScrubbing(true);
+        setTime(fractionAt(e.clientX) * duration);
+    };
+    const onBarPointerMove = (e: ReactPointerEvent) => {
+        const at = fractionAt(e.clientX) * duration;
+        setHover(at);
+        if (scrubbing) setTime(at);
+    };
+    const onBarPointerUp = (e: ReactPointerEvent) => {
+        if (!scrubbing) return;
+        setScrubbing(false);
+        seekTo(fractionAt(e.clientX) * duration);
+    };
+
+    const onTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+        const video = e.currentTarget;
+        if (scrubbing) return;
+        setTime(video.currentTime);
+        if (video.buffered.length) setBuffered(video.buffered.end(video.buffered.length - 1));
+    };
+
+    const showControls = !playing || !idle || scrubbing;
+    const isMuted = muted === 'true' || Number(volume) === 0;
+    const played = duration ? (time / duration) * 100 : 0;
+
+    return (
+        <div
+            ref={rootRef}
+            className={classNames('tb-player', { 'is-idle': !showControls, 'is-fullscreen': fullscreen })}
+            tabIndex={-1}
+            onPointerMove={wake}
+            onPointerLeave={() => playing && setIdle(true)}
+        >
+            {/* Captions come from the server as <track> children when the item has text subtitles */}
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <video
+                ref={videoRef}
+                className='tb-player__video'
+                playsInline
+                crossOrigin='anonymous'
+                onClick={togglePlay}
+                onDoubleClick={toggleFullscreen}
+                onPlay={() => setPlaying(true)}
+                onPause={() => setPlaying(false)}
+                onWaiting={() => setWaiting(true)}
+                onPlaying={() => setWaiting(false)}
+                onCanPlay={() => setWaiting(false)}
+                onTimeUpdate={onTimeUpdate}
+                onDurationChange={e => {
+                    const d = e.currentTarget.duration;
+                    if (Number.isFinite(d) && d > 0) setDuration(d);
+                }}
+                onEnded={onEnded}
+            >
+                {source?.subtitles.map(track => (
+                    <track key={track.index} kind='subtitles' label={track.label} srcLang={track.language} src={track.src} />
+                ))}
+            </video>
+
+            {waiting && !error && <div className='tb-player__spinner' aria-label='Loading' />}
+            {error && <div className='tb-player__error'>{error}</div>}
+
+            <div className='tb-player__chrome'>
+                <div
+                    ref={barRef}
+                    className={classNames('tb-scrubber', { 'is-scrubbing': scrubbing })}
+                    role='slider'
+                    aria-label='Seek'
+                    aria-valuemin={0}
+                    aria-valuemax={Math.round(duration)}
+                    aria-valuenow={Math.round(time)}
+                    onPointerDown={onBarPointerDown}
+                    onPointerMove={onBarPointerMove}
+                    onPointerUp={onBarPointerUp}
+                    onPointerLeave={() => setHover(undefined)}
+                >
+                    <div className='tb-scrubber__track'>
+                        <span className='tb-scrubber__buffered' style={{ width: `${duration ? (buffered / duration) * 100 : 0}%` }} />
+                        {hover !== undefined && <span className='tb-scrubber__hover' style={{ width: `${(hover / duration) * 100}%` }} />}
+                        <span className='tb-scrubber__played' style={{ width: `${played}%` }} />
+                    </div>
+                    <span className='tb-scrubber__thumb' style={{ left: `${played}%` }} />
+                    {hover !== undefined && (
+                        <span className='tb-scrubber__tooltip' style={{ left: `${(hover / duration) * 100}%` }}>{formatClock(hover)}</span>
+                    )}
+                </div>
+
+                <div className='tb-controls'>
+                    <button className='tb-ctl' aria-label={playing ? 'Pause (k)' : 'Play (k)'} onClick={togglePlay}>
+                        <Icon name={playing ? 'pause' : 'play'} filled />
+                    </button>
+                    {onNext && (
+                        <button className='tb-ctl' aria-label='Next (Shift+N)' onClick={onNext}>
+                            <Icon name='next' filled />
+                        </button>
+                    )}
+                    <div className='tb-volume'>
+                        <button className='tb-ctl' aria-label={isMuted ? globalize.translate('Unmute') : globalize.translate('Mute')} onClick={toggleMute}>
+                            <Icon name={isMuted ? 'mute' : 'volume'} />
+                        </button>
+                        <input
+                            className='tb-volume__slider'
+                            type='range'
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={isMuted ? 0 : Number(volume)}
+                            aria-label='Volume'
+                            onChange={e => {
+                                setVolume(e.target.value);
+                                if (Number(e.target.value) > 0) setMuted('false');
+                            }}
+                        />
+                    </div>
+                    <span className='tb-time'>{formatClock(time)} / {formatClock(duration)}</span>
+                    <span className='tb-controls__spacer' />
+                    {!!source?.subtitles.length && (
+                        <button
+                            className={classNames('tb-ctl', { 'is-on': captions })}
+                            aria-label={`${globalize.translate('Subtitles')} (c)`}
+                            aria-pressed={captions}
+                            onClick={() => setCaptions(c => !c)}
+                        >
+                            <Icon name='cc' />
+                        </button>
+                    )}
+                    {!fullscreen && (
+                        <button className='tb-ctl' aria-label={theater ? 'Default view (t)' : 'Theater mode (t)'} onClick={onToggleTheater}>
+                            <Icon name='theater' />
+                        </button>
+                    )}
+                    <button className='tb-ctl' aria-label={`${globalize.translate('ButtonFullscreen')} (f)`} onClick={toggleFullscreen}>
+                        <Icon name={fullscreen ? 'exitFullscreen' : 'fullscreen'} />
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default Player;

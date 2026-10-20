@@ -3,13 +3,17 @@ import globalize from 'lib/globalize';
 import Dashboard, { pageIdOn } from 'utils/dashboard';
 import { getParameterByName } from 'utils/url';
 import Events from 'utils/events';
+import { importFromGlob } from 'utils/globImport';
+
+const PROVIDERS = import.meta.glob('../../../components/tvproviders/*.js');
+const PROVIDER_TEMPLATES = import.meta.glob('../../../components/tvproviders/*.template.html');
 
 function onListingsSubmitted() {
     Dashboard.navigate('dashboard/livetv');
 }
 
 function init(page, type, providerId) {
-    import(`components/tvproviders/${type}`).then(({ default: ProviderFactory }) => {
+    importFromGlob(PROVIDERS, '../../../components/tvproviders/', type).then(({ default: ProviderFactory }) => {
         const instance = new ProviderFactory(page, providerId, {});
         Events.on(instance, 'submitted', onListingsSubmitted);
         instance.init();
@@ -17,7 +21,7 @@ function init(page, type, providerId) {
 }
 
 function loadTemplate(page, type, providerId) {
-    import(`components/tvproviders/${type}.template.html`).then(({ default: html }) => {
+    importFromGlob(PROVIDER_TEMPLATES, '../../../components/tvproviders/', `${type}.template.html`).then(({ default: html }) => {
         page.querySelector('.providerTemplate').innerHTML = globalize.translateHtml(html);
         init(page, type, providerId);
     });

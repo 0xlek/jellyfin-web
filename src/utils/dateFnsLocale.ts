@@ -1,4 +1,5 @@
 import enUS from 'date-fns/locale/en-US';
+import { importFromGlob } from 'utils/globImport';
 
 const LOCALE_MAP: Record<string, string> = {
     'af': 'af',
@@ -67,8 +68,11 @@ const DEFAULT_LOCALE = 'en-US';
 let localeString = DEFAULT_LOCALE;
 let locale = enUS;
 
+const LOCALES = import.meta.glob('../../node_modules/date-fns/esm/locale/*/index.js');
+
 export function fetchLocale(localeName: string) {
-    return import(`date-fns/locale/${localeName}/index.js`);
+    return importFromGlob<{ default: Locale }>(LOCALES, '../../node_modules/date-fns/esm/locale/', `${localeName}/index.js`)
+        .then(module => module.default);
 }
 
 export function normalizeLocale(localeName: string) {

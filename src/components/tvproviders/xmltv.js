@@ -1,4 +1,3 @@
-import 'jquery';
 import loading from '../loading/loading';
 import globalize from '../../lib/globalize';
 import '../../elements/emby-checkbox/emby-checkbox';
@@ -133,7 +132,7 @@ export default function (page, providerId, options) {
             info.NewsCategories = getCategories(page.querySelector('.txtNews'));
             info.SportsCategories = getCategories(page.querySelector('.txtSports'));
             info.EnableAllTuners = page.querySelector('.chkAllTuners').checked;
-            info.EnabledTuners = info.EnableAllTuners ? [] : $('.chkTuner', page).get().filter(function (tuner) {
+            info.EnabledTuners = info.EnableAllTuners ? [] : Array.from(page.querySelectorAll('.chkTuner')).filter(function (tuner) {
                 return tuner.checked;
             }).map(function (tuner) {
                 return tuner.getAttribute('data-id');
@@ -179,9 +178,9 @@ export default function (page, providerId, options) {
         const hideSubmitButton = options.showSubmitButton === false;
         page.querySelector('.btnSubmitListings').classList.toggle('hide', hideSubmitButton);
 
-        $('form', page).on('submit', function () {
+        page.querySelector('form').addEventListener('submit', function (e) {
+            e.preventDefault();
             submitListingsForm();
-            return false;
         });
         page.querySelector('#btnSelectPath').addEventListener('click', onSelectPathClick);
         page.querySelector('.chkAllTuners').addEventListener('change', function (evt) {

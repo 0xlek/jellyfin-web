@@ -1,43 +1,18 @@
 import escapeHtml from 'escape-html';
-import 'jquery';
 import 'material-design-icons-iconfont';
 
 import globalize from 'lib/globalize';
 import Dashboard from 'utils/dashboard';
 import { getParameterByName } from 'utils/url';
 
-// Disable the naming rules since jstree requires snake_case variables
-/* eslint-disable @typescript-eslint/naming-convention */
-function getNode(item, folderState, selected) {
-    const htmlName = getNodeInnerHtml(item);
-    const node = {
-        id: item.Id,
-        text: htmlName,
-        state: {
-            opened: item.IsFolder && folderState == 'open',
-            selected: selected
-        },
-        li_attr: {
-            serveritemtype: item.Type,
-            collectiontype: item.CollectionType
-        }
-    };
-    if (item.IsFolder) {
-        node.children = [{
-            text: 'Loading...',
-            icon: false
-        }];
-        node.icon = false;
-    } else {
-        node.icon = false;
-    }
-    if (node.state.opened) {
-        node.li_attr.loadedFromServer = true;
-    }
-    if (selected) {
-        selectedNodeId = item.Id;
-    }
-    return node;
+function getNodeIcon(item) {
+    if (item.IsFolder) return 'folder';
+    if (item.MediaType === 'Video') return 'movie';
+    if (item.MediaType === 'Audio') return 'audiotrack';
+    if (item.Type === 'TvChannel') return 'live_tv';
+    if (item.MediaType === 'Photo') return 'photo';
+    if (item.MediaType === 'Book') return 'book';
+    return null;
 }
 
 function getNodeInnerHtml(item) {
@@ -48,108 +23,77 @@ function getNodeInnerHtml(item) {
     if (item.IndexNumber != null && item.Type != 'Season') {
         name = item.IndexNumber + ' - ' + name;
     }
-    let htmlName = "<div class='editorNode'>";
-    if (item.IsFolder) {
-        htmlName += '<span class="material-icons metadataSidebarIcon folder" aria-hidden="true"></span>';
-    } else if (item.MediaType === 'Video') {
-        htmlName += '<span class="material-icons metadataSidebarIcon movie" aria-hidden="true"></span>';
-    } else if (item.MediaType === 'Audio') {
-        htmlName += '<span class="material-icons metadataSidebarIcon audiotrack" aria-hidden="true"></span>';
-    } else if (item.Type === 'TvChannel') {
-        htmlName += '<span class="material-icons metadataSidebarIcon live_tv" aria-hidden="true"></span>';
-    } else if (item.MediaType === 'Photo') {
-        htmlName += '<span class="material-icons metadataSidebarIcon photo" aria-hidden="true"></span>';
-    } else if (item.MediaType === 'Book') {
-        htmlName += '<span class="material-icons metadataSidebarIcon book" aria-hidden="true"></span>';
+    const icon = getNodeIcon(item);
+    let html = "<span class='editorNode'>";
+    if (icon) {
+        html += `<span class="material-icons metadataSidebarIcon ${icon}" aria-hidden="true"></span>`;
     }
     if (item.LockData) {
-        htmlName += '<span class="material-icons metadataSidebarIcon lock" aria-hidden="true"></span>';
+        html += '<span class="material-icons metadataSidebarIcon lock" aria-hidden="true"></span>';
     }
-    htmlName += escapeHtml(name);
-    htmlName += '</div>';
-    return htmlName;
+    html += escapeHtml(name);
+    html += '</span>';
+    return html;
 }
 
-function loadChildrenOfRootNode(page, scope, callback) {
-    ApiClient.getLiveTvChannels({
-        limit: 0
-    }).then(function (result) {
-        const nodes = [];
-        nodes.push({
-            id: 'MediaFolders',
-            text: globalize.translate('HeaderMediaFolders'),
-            state: {
-                opened: true
-            },
-            li_attr: {
-                itemtype: 'mediafolders',
-                loadedFromServer: true
-            },
-            icon: false
-        });
-        if (result.TotalRecordCount) {
-            nodes.push({
-                id: 'livetv',
-                text: globalize.translate('LiveTV'),
-                state: {
-                    opened: false
-                },
-                li_attr: {
-                    itemtype: 'livetv'
-                },
-                children: [{
-                    text: 'Loading...',
-                    icon: false
-                }],
-                icon: false
-            });
-        }
-        callback.call(scope, nodes);
-        nodesToLoad.push('MediaFolders');
-    });
-}
+/** A tree node: `id` and `label` (HTML), optional `isFolder`, `itemType`, `serverItemType`, `collectionType`. */
+function createNode(node) {
+    const li = document.createElement('li');
+    li.className = 'libraryTree-node';
+    li.dataset.id = node.id;
+    li.setAttribute('role', 'treeitem');
+    if (node.itemType) li.dataset.itemtype = node.itemType;
+    if (node.serverItemType) li.dataset.serveritemtype = node.serverItemType;
+    if (node.collectionType) li.dataset.collectiontype = node.collectionType;
 
-function loadLiveTvChannels(service, openItems, callback) {
-    ApiClient.getLiveTvChannels({
-        ServiceName: service,
-        AddCurrentProgram: false
-    }).then(function (result) {
-        const nodes = result.Items.map(function (i) {
-            const state = openItems.indexOf(i.Id) == -1 ? 'closed' : 'open';
-            return getNode(i, state, false);
-        });
-        callback(nodes);
-    });
-}
+    const row = document.createElement('div');
+    row.className = 'libraryTree-row';
 
-function loadMediaFolders(page, scope, openItems, callback) {
-    ApiClient.getJSON(ApiClient.getUrl('Library/MediaFolders')).then(function (result) {
-        const nodes = result.Items.map(function (n) {
-            const state = openItems.indexOf(n.Id) == -1 ? 'closed' : 'open';
-            return getNode(n, state, false);
-        });
-        callback.call(scope, nodes);
-        for (let i = 0, length = nodes.length; i < length; i++) {
-            if (nodes[i].state.opened) {
-                nodesToLoad.push(nodes[i].id);
-            }
-        }
-    });
-}
-
-function loadNode(page, scope, node, openItems, selectedId, currentUser, callback) {
-    const id = node.id;
-    if (id == '#') {
-        loadChildrenOfRootNode(page, scope, callback);
-        return;
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'libraryTree-toggle';
+    toggle.tabIndex = -1;
+    if (node.isFolder) {
+        li.setAttribute('aria-expanded', 'false');
+        toggle.innerHTML = '<span class="material-icons chevron_right" aria-hidden="true"></span>';
+        toggle.setAttribute('aria-label', globalize.translate('ButtonMore'));
+    } else {
+        toggle.disabled = true;
     }
-    if (id == 'livetv') {
-        loadLiveTvChannels(id, openItems, callback);
-        return;
+
+    const label = document.createElement('button');
+    label.type = 'button';
+    label.className = 'libraryTree-label';
+    label.innerHTML = node.label;
+
+    row.append(toggle, label);
+    li.append(row);
+    return li;
+}
+
+function setChildren(parent, children) {
+    parent.innerHTML = '';
+    parent.append(...children);
+}
+
+function itemToNode(item) {
+    return {
+        id: item.Id,
+        label: getNodeInnerHtml(item),
+        isFolder: item.IsFolder,
+        itemType: item.Type,
+        serverItemType: item.Type,
+        collectionType: item.CollectionType
+    };
+}
+
+function fetchChildren(li) {
+    const id = li.dataset.id;
+    if (id === 'MediaFolders') {
+        return ApiClient.getJSON(ApiClient.getUrl('Library/MediaFolders')).then(result => result.Items.map(itemToNode));
     }
-    if (id == 'MediaFolders') {
-        loadMediaFolders(page, scope, openItems, callback);
-        return;
+    if (id === 'livetv') {
+        return ApiClient.getLiveTvChannels({ AddCurrentProgram: false }).then(result => result.Items.map(itemToNode));
     }
     const query = {
         ParentId: id,
@@ -160,131 +104,100 @@ function loadNode(page, scope, node, openItems, selectedId, currentUser, callbac
         EnableImages: false,
         EnableUserData: false
     };
-    const itemtype = node.li_attr.itemtype;
-    if (itemtype != 'Season' && itemtype != 'Series') {
+    const itemType = li.dataset.itemtype;
+    if (itemType != 'Season' && itemType != 'Series') {
         query.SortBy = 'SortName';
     }
-    ApiClient.getItems(Dashboard.getCurrentUserId(), query).then(function (result) {
-        const nodes = result.Items.map(function (n) {
-            const state = openItems.indexOf(n.Id) == -1 ? 'closed' : 'open';
-            return getNode(n, state, n.Id == selectedId);
-        });
-        callback.call(scope, nodes);
-        for (let i = 0, length = nodes.length; i < length; i++) {
-            if (nodes[i].state.opened) {
-                nodesToLoad.push(nodes[i].id);
-            }
-        }
-    });
+    return ApiClient.getItems(Dashboard.getCurrentUserId(), query).then(result => result.Items.map(itemToNode));
 }
 
-function scrollToNode(id) {
-    const elem = $('#' + id)[0];
-    if (elem) {
-        elem.scrollIntoView();
-    }
+/** Expands a folder node, loading its children on first open; resolves once they are rendered. */
+function expand(li, state) {
+    li.setAttribute('aria-expanded', 'true');
+    let group = Array.from(li.children).find(child => child.classList.contains('libraryTree-group'));
+    if (group) return Promise.resolve(group);
+
+    group = document.createElement('ul');
+    group.className = 'libraryTree-group';
+    group.setAttribute('role', 'group');
+    group.innerHTML = '<li class="libraryTree-loading">…</li>';
+    li.append(group);
+
+    return fetchChildren(li).then(nodes => {
+        setChildren(group, nodes.map(createNode));
+        return Promise.all(Array.from(group.children).map(child => restoreState(child, state)));
+    }).then(() => group);
 }
 
-function initializeTree(page, currentUser, openItems, selectedId) {
-    Promise.all([
-        import('jstree'),
-        import('jstree/dist/themes/default/style.css')
-    ]).then(() => {
-        initializeTreeInternal(page, currentUser, openItems, selectedId);
-    });
+function collapse(li) {
+    li.setAttribute('aria-expanded', 'false');
 }
 
-function onNodeSelect(event, data) {
-    const node = data.node;
-    const eventData = {
-        id: node.id,
-        itemType: node.li_attr.itemtype,
-        serverItemType: node.li_attr.serveritemtype,
-        collectionType: node.li_attr.collectiontype
-    };
-    if (eventData.itemType != 'livetv' && eventData.itemType != 'mediafolders') {
-        {
-            this.dispatchEvent(new CustomEvent('itemclicked', {
-                detail: eventData,
-                bubbles: true,
-                cancelable: false
-            }));
-        }
-        document.querySelector('.editPageSidebar').classList.add('editPageSidebar-withcontent');
-    } else {
-        document.querySelector('.editPageSidebar').classList.remove('editPageSidebar-withcontent');
-    }
-}
+function select(tree, li) {
+    tree.querySelector('.libraryTree-node.is-selected')?.classList.remove('is-selected');
+    li.classList.add('is-selected');
 
-function onNodeOpen(_, data) {
-    const page = $(this).parents('.page')[0];
-    const node = data.node;
-    if (node.children) {
-        loadNodesToLoad(page, node);
-    }
-    if (node.li_attr && node.id != '#' && !node.li_attr.loadedFromServer) {
-        node.li_attr.loadedFromServer = true;
-        $.jstree.reference('.libraryTree', page).load_node(node.id, loadNodeCallback);
-    }
-}
-
-function initializeTreeInternal(page, currentUser, openItems, selectedId) {
-    nodesToLoad = [];
-    selectedNodeId = null;
-    $.jstree.destroy();
-    $('.libraryTree', page).jstree({
-        'plugins': ['wholerow'],
-        core: {
-            check_callback: true,
-            data: function (node, callback) {
-                loadNode(page, this, node, openItems, selectedId, currentUser, callback);
-            },
-            themes: {
-                variant: 'large'
-            }
-        }
-    })
-        .off('select_node.jstree', onNodeSelect)
-        .on('select_node.jstree', onNodeSelect)
-        .off('open_node.jstree', onNodeOpen)
-        .on('open_node.jstree', onNodeOpen)
-        .off('load_node.jstree', onNodeOpen)
-        .on('load_node.jstree', onNodeOpen);
-}
-
-function loadNodesToLoad(page, node) {
-    const children = node.children;
-    for (let i = 0, length = children.length; i < length; i++) {
-        const child = children[i];
-        if (nodesToLoad.indexOf(child) != -1) {
-            nodesToLoad = nodesToLoad.filter(function (n) {
-                return n != child;
-            });
-            $.jstree.reference('.libraryTree', page).load_node(child, loadNodeCallback);
-        }
-    }
-}
-
-function loadNodeCallback(node) {
-    if (selectedNodeId && node.children && node.children.indexOf(selectedNodeId) != -1) {
-        setTimeout(function () {
-            scrollToNode(selectedNodeId);
-        }, 500);
-    }
-}
-
-function updateEditorNode(page, item) {
-    const elem = $('#' + item.Id + '>a', page)[0];
-    if (elem == null) {
+    const itemType = li.dataset.itemtype;
+    const sidebar = document.querySelector('.editPageSidebar');
+    if (itemType === 'livetv' || itemType === 'mediafolders') {
+        sidebar?.classList.remove('editPageSidebar-withcontent');
         return;
     }
-    $('.editorNode', elem).remove();
-    $(elem).append(getNodeInnerHtml(item));
-    if (item.IsFolder) {
-        const tree = jQuery.jstree._reference('.libraryTree');
-        const currentNode = tree._get_node(null, false);
-        tree.refresh(currentNode);
+    tree.dispatchEvent(new CustomEvent('itemclicked', {
+        detail: {
+            id: li.dataset.id,
+            itemType,
+            serverItemType: li.dataset.serveritemtype,
+            collectionType: li.dataset.collectiontype
+        },
+        bubbles: true,
+        cancelable: false
+    }));
+    sidebar?.classList.add('editPageSidebar-withcontent');
+}
+
+/** Re-opens the ancestors of the item being edited and marks it selected. */
+function restoreState(li, state) {
+    const id = li.dataset.id;
+    if (id === state.selectedId) {
+        li.classList.add('is-selected');
+        setTimeout(() => li.scrollIntoView({ block: 'center' }), 0);
     }
+    if (li.hasAttribute('aria-expanded') && state.openIds.includes(id)) {
+        return expand(li, state);
+    }
+    return Promise.resolve();
+}
+
+function initializeTree(page, openIds, selectedId) {
+    const tree = page.querySelector('.libraryTree');
+    const state = { openIds: [ 'MediaFolders', ...openIds ], selectedId };
+    const root = document.createElement('ul');
+    root.className = 'libraryTree-root';
+    root.setAttribute('role', 'tree');
+    setChildren(tree, [ root ]);
+
+    tree.onclick = e => {
+        const li = e.target.closest('.libraryTree-node');
+        if (!li || !tree.contains(li)) return;
+        if (e.target.closest('.libraryTree-toggle')) {
+            if (li.getAttribute('aria-expanded') === 'true') collapse(li);
+            else expand(li, state);
+            return;
+        }
+        select(tree, li);
+    };
+
+    ApiClient.getLiveTvChannels({ limit: 0 }).then(result => {
+        const nodes = [ { id: 'MediaFolders', label: escapeHtml(globalize.translate('HeaderMediaFolders')), isFolder: true, itemType: 'mediafolders' } ];
+        if (result.TotalRecordCount) {
+            nodes.push({ id: 'livetv', label: escapeHtml(globalize.translate('LiveTV')), isFolder: true, itemType: 'livetv' });
+        }
+        setChildren(root, nodes.map(createNode));
+        Array.from(root.children).forEach(li => {
+            void restoreState(li, state);
+        });
+    });
 }
 
 let itemId;
@@ -299,32 +212,19 @@ export function getCurrentItemId() {
     return getParameterByName('id');
 }
 
-let nodesToLoad = [];
-let selectedNodeId;
-$(document).on('itemsaved', '.metadataEditorPage', function (e, item) {
-    updateEditorNode(this, item);
-}).on('pagebeforeshow', '.metadataEditorPage', function () {
+document.addEventListener('pagebeforeshow', e => {
+    const page = e.target;
+    if (!(page instanceof Element) || !page.classList.contains('metadataEditorPage')) return;
+
     import('../styles/metadataeditor.scss');
-}).on('pagebeforeshow', '.metadataEditorPage', function () {
-    const page = this;
-    Dashboard.getCurrentUser().then(function (user) {
+    Dashboard.getCurrentUser().then(user => {
         const id = getCurrentItemId();
-        if (id) {
-            ApiClient.getAncestorItems(id, user.Id).then(function (ancestors) {
-                const ids = ancestors.map(function (i) {
-                    return i.Id;
-                });
-                initializeTree(page, user, ids, id);
-            });
-        } else {
-            initializeTree(page, user, []);
+        if (!id) {
+            initializeTree(page, []);
+            return;
         }
+        ApiClient.getAncestorItems(id, user.Id).then(ancestors => {
+            initializeTree(page, ancestors.map(i => i.Id), id);
+        });
     });
-}).on('pagebeforehide', '.metadataEditorPage', function () {
-    const page = this;
-    $('.libraryTree', page)
-        .off('select_node.jstree', onNodeSelect)
-        .off('open_node.jstree', onNodeOpen)
-        .off('load_node.jstree', onNodeOpen);
 });
-/* eslint-enable @typescript-eslint/naming-convention */

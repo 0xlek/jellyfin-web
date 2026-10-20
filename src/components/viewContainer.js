@@ -38,8 +38,7 @@ export function loadView(options) {
             pageIndex = 0;
         }
 
-        const isPluginpage = options.url.includes('configurationpage');
-        const newViewInfo = normalizeNewView(options, isPluginpage);
+        const newViewInfo = normalizeNewView(options);
         const newView = newViewInfo.elem;
 
         const currentPage = allPages[pageIndex];
@@ -65,16 +64,13 @@ export function loadView(options) {
         }
 
         if (currentPage) {
-            if (newViewInfo.hasScript && window.$) {
-                mainAnimatedPages.removeChild(currentPage);
-                view = $(view).appendTo(mainAnimatedPages)[0];
-            } else {
-                mainAnimatedPages.replaceChild(view, currentPage);
-            }
-        } else if (newViewInfo.hasScript && window.$) {
-            view = $(view).appendTo(mainAnimatedPages)[0];
+            mainAnimatedPages.replaceChild(view, currentPage);
         } else {
             mainAnimatedPages.appendChild(view);
+        }
+
+        if (newViewInfo.hasScript) {
+            runInlineScripts(view);
         }
 
         if (options.type) {
@@ -109,11 +105,6 @@ export function loadView(options) {
                     afterAnimate(allPages, pageIndex);
                 }
 
-                if (window.$) {
-                    $.mobile = $.mobile || {};
-                    $.mobile.activePage = view;
-                }
-
                 return view;
             });
     }
@@ -131,7 +122,7 @@ function parseHtml(html, hasScript) {
     return wrapper.querySelector('div[data-role="page"]');
 }
 
-function normalizeNewView(options, isPluginpage) {
+function normalizeNewView(options) {
     const viewHtml = options.view;
 
     if (viewHtml.indexOf('data-role="page"') === -1) {
@@ -145,23 +136,22 @@ function normalizeNewView(options, isPluginpage) {
         hasScript = elem.querySelector('script') != null;
     }
 
-    let hasjQuery = false;
-    let hasjQuerySelect = false;
-    let hasjQueryChecked = false;
-
-    if (isPluginpage) {
-        hasjQuery = viewHtml.indexOf('jQuery') != -1 || viewHtml.indexOf('$(') != -1 || viewHtml.indexOf('$.') != -1;
-        hasjQueryChecked = viewHtml.indexOf('.checked(') != -1;
-        hasjQuerySelect = viewHtml.indexOf('.selectmenu(') != -1;
-    }
-
     return {
         elem: elem,
-        hasScript: hasScript,
-        hasjQuerySelect: hasjQuerySelect,
-        hasjQueryChecked: hasjQueryChecked,
-        hasjQuery: hasjQuery
+        hasScript: hasScript
     };
+}
+
+/** Scripts inserted through innerHTML never run, so plugin pages get fresh copies of their inline scripts. */
+function runInlineScripts(view) {
+    for (const original of view.querySelectorAll('script')) {
+        const script = document.createElement('script');
+        for (const attr of original.attributes) {
+            script.setAttribute(attr.name, attr.value);
+        }
+        script.text = original.text;
+        original.parentNode.replaceChild(script, original);
+    }
 }
 
 function beforeAnimate(allPages, newPageIndex, oldPageIndex) {
@@ -211,11 +201,6 @@ export function tryRestoreView(options) {
 
                 if (!options.cancel && previousAnimatable) {
                     afterAnimate(allPages, index);
-                }
-
-                if (window.$) {
-                    $.mobile = $.mobile || {};
-                    $.mobile.activePage = view;
                 }
 
                 return view;

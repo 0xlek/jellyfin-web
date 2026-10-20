@@ -1,0 +1,28 @@
+# Supply-chain policy carried over from the former .npmrc
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - '@jellyfin/*'
+engineStrict: true
+saveExact: true
+
+# Upstream ran with ignore-scripts=true; keep every install script disabled
+allowBuilds:
+  '@parcel/watcher': false
+  core-js: false
+  es5-ext: false
+  esbuild: false
+
+# canvas is pdfjs-dist's Node-only renderer; the browser build never uses it (it also pulled a vulnerable tar)
+ignoredOptionalDependencies:
+  - canvas
+
+overrides:
+  # sonarjs depends on typescript ">=5", which resolves to 7.x (no JS compiler API) without npm's dedupe
+  eslint-plugin-sonarjs>typescript: 5.9.3
+  # Security fixes for transitive dependencies (pnpm audit), each the lowest patched version in the same line
+  '@xmldom/xmldom@<0.8.15': 0.8.15
+  eslint-plugin-sonarjs>minimatch: 10.2.3
+  postcss-selector-parser@<7.1.6: 7.1.6
+  qs@<6.16.0: 6.16.0
+  sockjs>uuid: 11.1.1
+  trim@<0.0.3: 0.0.3

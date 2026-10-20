@@ -12,6 +12,9 @@ import Events from 'utils/events';
 import '../../../elements/emby-tabs/emby-tabs';
 import '../../../elements/emby-button/emby-button';
 import '../../../elements/emby-scroller/emby-scroller';
+import { importFromGlob } from 'utils/globImport';
+
+const TAB_CONTROLLERS = import.meta.glob([ '../../legacy/controllers/favorites.js', '../../legacy/controllers/hometab.js' ]);
 
 type OnResumeOptions = {
     autoFocus?: boolean;
@@ -71,7 +74,7 @@ const Home = () => {
                 depends = 'favorites';
         }
 
-        return import(/* webpackChunkName: "[request]" */ `../../../apps/legacy/controllers/${depends}`).then(({ default: ControllerFactory }) => {
+        return importFromGlob(TAB_CONTROLLERS, '../../legacy/controllers/', depends).then(({ default: ControllerFactory }) => {
             let controller = tabControllers[index];
 
             if (!controller) {

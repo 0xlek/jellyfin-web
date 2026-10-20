@@ -10,6 +10,9 @@ import toast from '../components/toast/toast';
 import confirm from '../components/confirm/confirm';
 import { ServerConnections } from 'lib/jellyfin-apiclient';
 import * as dashboard from '../utils/dashboard';
+import { importFromGlob } from '../utils/globImport';
+
+const PLUGINS = import.meta.glob([ '../plugins/**/*.{js,ts,tsx}', '!**/*.test.*' ]);
 
 // TODO: replace with each plugin version
 const cacheParam = new Date().getTime();
@@ -94,7 +97,7 @@ class PluginManager {
                 });
             } else {
                 console.debug(`Loading plugin (via dynamic import): ${pluginSpec}`);
-                const pluginResult = await import(/* webpackChunkName: "[request]" */ `../plugins/${pluginSpec}`);
+                const pluginResult = await importFromGlob(PLUGINS, '../plugins/', pluginSpec);
                 plugin = new pluginResult.default;
             }
         } else if (pluginSpec.then) {

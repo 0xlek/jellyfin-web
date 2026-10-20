@@ -2,7 +2,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import React from 'react';
 import {
     RouterProvider,
-    createHashRouter,
+    createBrowserRouter,
     Outlet,
     useLocation
 } from 'react-router-dom';
@@ -10,19 +10,30 @@ import {
 import { DASHBOARD_APP_PATHS, DASHBOARD_APP_ROUTES } from 'apps/dashboard/routes/routes';
 import { APP_ROUTES as MODERN_APP_ROUTES } from 'apps/modern/routes/routes';
 import { APP_ROUTES as LEGACY_APP_ROUTES } from 'apps/legacy/routes/routes';
+import { TUBE_PATHS, TUBE_ROUTES } from 'apps/tube/routes';
 import { WIZARD_APP_ROUTES } from 'apps/wizard/routes/routes';
 import AppHeader from 'components/AppHeader';
 import Backdrop from 'components/Backdrop';
 import layoutManager from 'components/layoutManager';
 import BangRedirect from 'components/router/BangRedirect';
+import HashLinkBridge from 'components/router/HashLinkBridge';
 import { createRouterHistory } from 'components/router/routerHistory';
 import appTheme from 'themes';
 import { ThemeStorageManager } from 'themes/themeStorageManager';
 
-const router = createHashRouter([
+// <base> is set in index.html to the app root, e.g. /web/ when served by the Jellyfin server
+const basename = new URL(document.baseURI).pathname.replace(/\/$/, '');
+
+// Old bookmarks use hash routes (/web/#/details?id=…); move them into the path before any route redirects run
+const hashRoute = /^#!?(\/.*)$/.exec(window.location.hash);
+if (hashRoute) window.history.replaceState(null, '', basename + hashRoute[1]);
+
+const router = createBrowserRouter([
     {
         element: <RootAppLayout />,
         children: [
+            // Matched before the classic routes, so these paths take over from their classic pages
+            ...TUBE_ROUTES,
             ...(layoutManager.modern ? MODERN_APP_ROUTES : LEGACY_APP_ROUTES),
             ...DASHBOARD_APP_ROUTES,
             ...WIZARD_APP_ROUTES,
@@ -32,7 +43,7 @@ const router = createHashRouter([
             }
         ]
     }
-]);
+], { basename });
 
 export const history = createRouterHistory(router);
 
@@ -47,7 +58,8 @@ export default function RootAppRouter() {
 function RootAppLayout() {
     const location = useLocation();
     const isNewLayoutPath = Object.values(DASHBOARD_APP_PATHS)
-        .some(path => location.pathname.startsWith(`/${path}`));
+        .some(path => location.pathname.startsWith(`/${path}`))
+        || TUBE_PATHS.some(path => location.pathname === `/${path}` || location.pathname.startsWith(`/${path}/`));
 
     return (
         <ThemeProvider
@@ -55,6 +67,7 @@ function RootAppLayout() {
             defaultMode='dark'
             storageManager={ThemeStorageManager}
         >
+            <HashLinkBridge />
             <Backdrop />
             <AppHeader isHidden={layoutManager.modern || isNewLayoutPath} />
 

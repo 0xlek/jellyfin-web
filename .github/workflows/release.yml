@@ -1,0 +1,89 @@
+name: release
+
+# Push a tag like v0.1.0 to publish ghcr.io/<owner>/jellyfin-web:<version> and a GitHub release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write # create the GitHub release
+  packages: write # push to ghcr.io with GITHUB_TOKEN
+
+concurrency:
+  group: release-${{ github.ref }}
+
+jobs:
+  release:
+    runs-on: jellyfin-web
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+      CANDIDATE: jellyfin-web:candidate
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 11.5.2
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: echo "pnpm_config_registry=$npm_config_registry" >> "$GITHUB_ENV"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm build:check
+      - run: pnpm test
+
+      - name: Build image
+        run: |
+          # Layers are cached in the runners' local S3 (Garage, LOCAL_S3_* from the runner environment)
+          docker buildx create --name ci --driver docker-container --use \
+            --driver-opt network=host \
+            --driver-opt image=moby/buildkit:v0.33.0@sha256:6c2fa84a6b61ccd72899dde4239f8d5717f05f9a8ca6f3cad185fb1a95a94de3
+          cache="type=s3,bucket=buildkit,name=jellyfin-web,region=$LOCAL_S3_REGION,endpoint_url=$LOCAL_S3_ENDPOINT,use_path_style=true,access_key_id=$LOCAL_S3_ACCESS_KEY_ID,secret_access_key=$LOCAL_S3_SECRET_ACCESS_KEY"
+          # The host network reaches the in-cluster npm cache set in the runner's environment
+          docker buildx build --platform linux/amd64 --pull --network host --load -t "$CANDIDATE" \
+            --cache-from "$cache" --cache-to "$cache,mode=max" \
+            --build-arg NPM_CONFIG_REGISTRY="$npm_config_registry" \
+            --build-arg JELLYFIN_VERSION="$GITHUB_REF_NAME" \
+            --build-arg COMMIT_SHA="$GITHUB_SHA" \
+            --label org.opencontainers.image.source="https://github.com/$GITHUB_REPOSITORY" \
+            --label org.opencontainers.image.revision="$GITHUB_SHA" \
+            --label org.opencontainers.image.version="$GITHUB_REF_NAME" .
+
+      - name: Smoke test
+        run: |
+          docker run -d --name smoke --network host "$CANDIDATE"
+          for _ in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:8080/web/ && break; sleep 1; done
+          curl -sf http://127.0.0.1:8080/web/ | grep -q 'id="reactRoot"'
+          # Deep links get the app shell (browser-history routing)
+          curl -sf "http://127.0.0.1:8080/web/watch?v=x" | grep -q 'id="reactRoot"'
+          curl -sf -o /dev/null http://127.0.0.1:8080/web/themes/dark/theme.css
+          curl -sf -o /dev/null http://127.0.0.1:8080/web/serviceworker.js
+
+      - name: Push image
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          image="${IMAGE,,}"
+          version="${GITHUB_REF_NAME#v}"
+          # The tested image itself is pushed, not a rebuild
+          for tag in "$version" latest; do
+            docker tag "$CANDIDATE" "$image:$tag"
+            docker push "$image:$tag"
+          done
+          ref=$(docker inspect --format '{{index .RepoDigests 0}}' "$image:$version")
+          echo "IMAGE_REF=$ref" >> "$GITHUB_ENV"
+          echo "- \`$ref\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --generate-notes --notes "$(printf 'Image: `%s`\n\n```\ndocker run -p 8080:8080 %s\n```\nThen open http://localhost:8080/web/ and add your Jellyfin server.' "$IMAGE_REF" "$IMAGE_REF")"
+
+      - name: Clean up
+        if: always()
+        run: docker rm -f smoke >/dev/null 2>&1 || true

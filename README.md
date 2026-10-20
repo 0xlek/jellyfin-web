@@ -41,34 +41,44 @@ Jellyfin Web is the frontend used for most of the clients available for end user
 
 ### Dependencies
 
-- [Node.js](https://nodejs.org/en/download)
-- npm (included in Node.js)
+- [Node.js](https://nodejs.org/en/download) 24+
+- [pnpm](https://pnpm.io) 11.5+
 
 ### Getting Started
 
-1. Clone or download this repository.
+1. Clone this repository.
 
    ```sh
-   git clone https://github.com/jellyfin/jellyfin-web.git
+   git clone https://github.com/0xlek/jellyfin-web.git
    cd jellyfin-web
    ```
 
-2. Install build dependencies in the project directory.
+2. Install dependencies.
 
    ```sh
-   npm install
+   pnpm install
    ```
 
-3. Run the web client with webpack for local development.
+3. Run the web client with Vite for local development.
 
    ```sh
-   npm start
+   pnpm start
    ```
 
-4. Build the client with sourcemaps available.
+4. Build the client for production into `dist/`.
 
    ```sh
-   npm run build:development
+   pnpm build:production
    ```
+
+### Container image
+
+Tagged releases (`v*`) publish `ghcr.io/0xlek/jellyfin-web`, an nginx image serving the client at `/web/`:
+
+```sh
+docker run -p 8080:8080 ghcr.io/0xlek/jellyfin-web:latest
+```
+
+Open http://localhost:8080/web/ and add your Jellyfin server.
 
 Review the [Contributing Guide](./CONTRIBUTING.md) for more information on our process and tech stack.

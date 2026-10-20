@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router-dom';
 
 import { AppType } from 'constants/appType';
+import { importFromGlob } from 'utils/globImport';
 
 export interface AsyncRoute {
     /** The URL path for this route. */
@@ -14,15 +15,15 @@ export interface AsyncRoute {
     type?: AppType
 }
 
+const ROUTES: Partial<Record<AppType, [ string, Record<string, () => Promise<unknown>> ]>> = {
+    [AppType.Dashboard]: [ '../../apps/dashboard/routes/', import.meta.glob([ '../../apps/dashboard/routes/**/*.{ts,tsx,js}', '!**/*.test.*' ]) ],
+    [AppType.Modern]: [ '../../apps/modern/routes/', import.meta.glob([ '../../apps/modern/routes/**/*.{ts,tsx,js}', '!**/*.test.*' ]) ],
+    [AppType.Legacy]: [ '../../apps/legacy/routes/', import.meta.glob([ '../../apps/legacy/routes/**/*.{ts,tsx,js}', '!**/*.test.*' ]) ]
+};
+
 const importRoute = (page: string, type: AppType) => {
-    switch (type) {
-        case AppType.Dashboard:
-            return import(/* webpackChunkName: "[request]" */ `../../apps/dashboard/routes/${page}`);
-        case AppType.Modern:
-            return import(/* webpackChunkName: "[request]" */ `../../apps/modern/routes/${page}`);
-        case AppType.Legacy:
-            return import(/* webpackChunkName: "[request]" */ `../../apps/legacy/routes/${page}`);
-    }
+    const [ base, modules ] = ROUTES[type] ?? ROUTES[AppType.Legacy]!;
+    return importFromGlob(modules, base, page);
 };
 
 export const toAsyncPageRoute = ({

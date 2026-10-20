@@ -7,6 +7,7 @@ import type { RestoreViewFailResponse } from 'types/viewManager';
 
 import viewManager from './viewManager';
 import { AppType } from 'constants/appType';
+import { importFromGlob } from 'utils/globImport';
 
 export interface ViewManagerPageProps {
     appType?: AppType
@@ -33,31 +34,35 @@ interface ViewOptions {
     }
 }
 
+// Controllers and their HTML views are looked up by name at runtime, so every candidate is listed up front
+const CONTROLLERS = {
+    [AppType.Dashboard]: import.meta.glob([ '../../apps/dashboard/controllers/**/*.{js,ts,tsx}', '!**/*.test.*' ]),
+    [AppType.Wizard]: import.meta.glob([ '../../apps/wizard/controllers/**/*.{js,ts,tsx}', '!**/*.test.*' ]),
+    [AppType.Legacy]: import.meta.glob([ '../../apps/legacy/controllers/**/*.{js,ts,tsx}', '!**/*.test.*' ])
+};
+const VIEWS = {
+    [AppType.Dashboard]: import.meta.glob('../../apps/dashboard/controllers/**/*.html'),
+    [AppType.Wizard]: import.meta.glob('../../apps/wizard/controllers/**/*.html'),
+    [AppType.Legacy]: import.meta.glob('../../apps/legacy/controllers/**/*.html')
+};
+const CONTROLLER_BASE = {
+    [AppType.Dashboard]: '../../apps/dashboard/controllers/',
+    [AppType.Wizard]: '../../apps/wizard/controllers/',
+    [AppType.Legacy]: '../../apps/legacy/controllers/'
+};
+
 const importController = (
     appType: AppType,
     controller: string,
     view: string
 ) => {
-    switch (appType) {
-        case AppType.Dashboard:
-            return Promise.all([
-                import(/* webpackChunkName: "[request]" */ `../../apps/dashboard/controllers/${controller}`),
-                import(/* webpackChunkName: "[request]" */ `../../apps/dashboard/controllers/${view}`)
-                    .then(html => globalize.translateHtml(html))
-            ]);
-        case AppType.Wizard:
-            return Promise.all([
-                import(/* webpackChunkName: "[request]" */ `../../apps/wizard/controllers/${controller}`),
-                import(/* webpackChunkName: "[request]" */ `../../apps/wizard/controllers/${view}`)
-                    .then(html => globalize.translateHtml(html))
-            ]);
-        default:
-            return Promise.all([
-                import(/* webpackChunkName: "[request]" */ `../../apps/legacy/controllers/${controller}`),
-                import(/* webpackChunkName: "[request]" */ `../../apps/legacy/controllers/${view}`)
-                    .then(html => globalize.translateHtml(html))
-            ]);
-    }
+    const type = appType === AppType.Dashboard || appType === AppType.Wizard ? appType : AppType.Legacy;
+    const base = CONTROLLER_BASE[type];
+    return Promise.all([
+        importFromGlob(CONTROLLERS[type], base, controller),
+        importFromGlob(VIEWS[type], base, view)
+            .then(html => globalize.translateHtml(html))
+    ]);
 };
 
 const loadView = async (

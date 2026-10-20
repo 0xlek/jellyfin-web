@@ -1,10 +1,7 @@
 import globalize from 'lib/globalize';
 
 export function showLayoutMenu (button, currentLayout, views) {
-    let dispatchEvent = true;
-
     if (!views) {
-        dispatchEvent = false;
         views = button.getAttribute('data-layouts');
         views = views ? views.split(',') : ['List', 'Poster', 'PosterCard', 'Thumb', 'ThumbCard'];
     }
@@ -29,10 +26,6 @@ export function showLayoutMenu (button, currentLayout, views) {
                     bubbles: true,
                     cancelable: false
                 }));
-
-                if (!dispatchEvent && window.$) {
-                    $(button).trigger('layoutchange', [id]);
-                }
             }
         }).catch(() => { /* no-op */ });
     });

@@ -15,6 +15,9 @@ import 'elements/emby-tabs/emby-tabs';
 import 'elements/emby-button/emby-button';
 
 import 'styles/scrollstyles.scss';
+import { importFromGlob } from 'utils/globImport';
+
+const TAB_CONTROLLERS = import.meta.glob([ './*.js', '!./*.test.js' ]);
 
 function enableScrollX() {
     return !layoutManager.desktop;
@@ -263,7 +266,7 @@ export default function (view, params) {
                 break;
         }
 
-        import(`../livetv/${depends}`).then(({ default: ControllerFactory }) => {
+        importFromGlob(TAB_CONTROLLERS, './', depends).then(({ default: ControllerFactory }) => {
             let tabContent;
 
             if (index === 0) {
