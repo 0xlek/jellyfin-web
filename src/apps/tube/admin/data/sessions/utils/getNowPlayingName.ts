@@ -1,7 +1,7 @@
 import type { SessionInfoDto } from '@jellyfin/sdk/lib/generated-client/models/session-info-dto';
-import itemHelper from 'components/itemHelper';
 import formatDistanceToNow from 'date-fns/formatDistanceToNow';
 import globalize from 'lib/globalize';
+import { getDisplayName } from 'utils/itemName';
 import ServerConnections from 'lib/jellyfin-apiclient/ServerConnections';
 import { getLocaleWithSuffix } from 'utils/dateFnsLocale';
 
@@ -22,7 +22,7 @@ const getNowPlayingName = (session: SessionInfoDto): NowPlayingInfo => {
         };
     }
 
-    let topText = itemHelper.getDisplayName(nowPlayingItem);
+    let topText = getDisplayName(nowPlayingItem);
     let bottomText = '';
 
     if (nowPlayingItem.Artists?.length) {
@@ -30,12 +30,12 @@ const getNowPlayingName = (session: SessionInfoDto): NowPlayingInfo => {
         topText = nowPlayingItem.Artists[0];
     } else if (nowPlayingItem.SeriesName || nowPlayingItem.Album) {
         bottomText = topText;
-        topText = nowPlayingItem.SeriesName || nowPlayingItem.Album;
+        topText = nowPlayingItem.SeriesName ?? nowPlayingItem.Album ?? '';
     } else if (nowPlayingItem.ProductionYear) {
         bottomText = nowPlayingItem.ProductionYear.toString();
     }
 
-    const apiClient = ServerConnections.getApiClient(session.ServerId);
+    const apiClient = ServerConnections.getApiClient(session.ServerId ?? '');
     if (apiClient) {
         if (nowPlayingItem.ImageTags?.Logo) {
             imgUrl = apiClient.getScaledImageUrl(nowPlayingItem.Id!, {

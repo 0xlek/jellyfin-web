@@ -25,8 +25,12 @@ export class RouterHistory implements History {
         return this._router.state.historyAction;
     }
 
+    /** The location relative to the basename, as push and replace take it */
     get location() {
-        return this._router.state.location;
+        const location = this._router.state.location;
+        const basename = this._router.basename;
+        if (!basename || basename === '/' || !location.pathname.startsWith(basename)) return location;
+        return { ...location, pathname: location.pathname.substring(basename.length) || '/' };
     }
 
     back() {

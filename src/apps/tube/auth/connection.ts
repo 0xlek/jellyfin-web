@@ -1,35 +1,18 @@
 import type { Api } from '@jellyfin/sdk';
 import type { NavigateFunction } from 'react-router-dom';
 
-import ServerConnections from 'lib/jellyfin-apiclient/ServerConnections';
+import ServerConnections, { type ConnectResult } from 'lib/jellyfin-apiclient/ServerConnections';
 import { ConnectionState } from 'lib/jellyfin-apiclient';
 import globalize from 'lib/globalize';
 import appSettings from 'scripts/settings/appSettings';
 
-/** A server the client has connected to before, as the connection manager stores it. */
-export type SavedServer = {
-    Id: string
-    Name?: string
-    ManualAddress?: string
-    LocalAddress?: string
-    RemoteAddress?: string
-    DateLastAccessed?: number
-    UserId?: string | null
-};
-
-type ConnectionResult = {
-    State: ConnectionState
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ApiClient?: any
-    Servers?: SavedServer[]
-    SystemInfo?: { StartupWizardCompleted?: boolean }
-};
+export type { SavedServer } from 'lib/jellyfin-apiclient/ServerConnections';
 
 /**
  * Goes where a connection attempt leads: home when already signed in, the sign-in page, the wizard on a
  * fresh server or the server list. Returns a message when it leads nowhere.
  */
-export const followConnection = (result: ConnectionResult, navigate: NavigateFunction): string | undefined => {
+export const followConnection = (result: ConnectResult, navigate: NavigateFunction): string | undefined => {
     switch (result.State) {
         case ConnectionState.SignedIn:
             ServerConnections.setLocalApiClient(result.ApiClient);

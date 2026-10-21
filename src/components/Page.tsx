@@ -2,7 +2,6 @@ import classNames from 'classnames';
 import { BaseItemKind } from '@jellyfin/sdk/lib/generated-client/models/base-item-kind';
 import React, { type FC, type PropsWithChildren, type HTMLAttributes, useEffect, useRef, StrictMode } from 'react';
 
-import autoFocuser from 'components/autoFocuser';
 import viewManager from 'components/viewManager/viewManager';
 
 type CustomPageProps = {
@@ -12,7 +11,6 @@ type CustomPageProps = {
     isMenuButtonEnabled?: boolean,
     isNowPlayingBarEnabled?: boolean,
     isThemeMediaSupported?: boolean,
-    shouldAutoFocus?: boolean,
     backDropType?: BaseItemKind[]
 };
 
@@ -31,7 +29,6 @@ const Page: FC<PropsWithChildren<PageProps>> = ({
     isMenuButtonEnabled = false,
     isNowPlayingBarEnabled = true,
     isThemeMediaSupported = false,
-    shouldAutoFocus = false,
     backDropType
 }) => {
     const element = useRef<HTMLDivElement>(null);
@@ -62,12 +59,6 @@ const Page: FC<PropsWithChildren<PageProps>> = ({
         // pageshow - updates header/navigation in libraryMenu
         element.current?.dispatchEvent(new CustomEvent('pageshow', event));
     }, [ element, isNowPlayingBarEnabled, isThemeMediaSupported ]);
-
-    useEffect(() => {
-        if (shouldAutoFocus) {
-            autoFocuser.autoFocus(element.current);
-        }
-    }, [ shouldAutoFocus ]);
 
     return (
         <StrictMode>

@@ -38,9 +38,7 @@ async function confirm(options: string | ConfirmOptions, title: string = '') {
         type: options.primary === 'delete' ? 'delete' : 'submit'
     });
 
-    options.buttons = items;
-
-    return dialog.show(options).then(result => {
+    return dialog.show({ ...options, buttons: items }).then(result => {
         if (result === 'ok') {
             return Promise.resolve();
         }

@@ -24,7 +24,7 @@ const AddServer: FC = () => {
             const result = await ServerConnections.connectToAddress(host.trim(), connectOptions());
             setError(followConnection(result, navigate));
         } catch {
-            setError(followConnection({ State: ConnectionState.Unavailable }, navigate));
+            setError(followConnection({ State: ConnectionState.Unavailable, Servers: [] }, navigate));
         } finally {
             setBusy(false);
         }

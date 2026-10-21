@@ -1,102 +1,53 @@
-import DOMPurify from 'dompurify';
-import React, { FC, useCallback, useEffect, useState } from 'react';
+import React, { type FC, useState } from 'react';
+import { Link } from 'react-router-dom';
 
-import { appHost } from 'components/apphost';
-import Page from 'components/Page';
-import toast from 'components/toast/toast';
-import { AppFeature } from 'constants/appFeature';
-import LinkButton from 'elements/emby-button/LinkButton';
 import globalize from 'lib/globalize';
-import ServerConnections from 'lib/jellyfin-apiclient/ServerConnections';
 import { ConnectionState } from 'lib/jellyfin-apiclient';
+import ServerConnections from 'lib/jellyfin-apiclient/ServerConnections';
 
-interface ConnectionErrorPageProps {
-    state: ConnectionState
-}
+import 'apps/tube/tube.scss';
+import 'apps/tube/forms.scss';
 
-const ConnectionErrorPage: FC<ConnectionErrorPageProps> = ({
-    state
-}) => {
-    const [ title, setTitle ] = useState<string>();
-    const [ htmlMessage, setHtmlMessage ] = useState<string>();
-    const [ message, setMessage ] = useState<string>();
-    const [ isConnectDisabled, setIsConnectDisabled ] = useState(false);
+const MESSAGES: Partial<Record<ConnectionState, [ title: string, message: () => string ]>> = {
+    [ConnectionState.ServerMismatch]: [ 'HeaderServerMismatch', () => globalize.translate('MessageServerMismatch') ],
+    [ConnectionState.ServerUpdateNeeded]: [ 'HeaderUpdateRequired', () => 'This server is too old for this client. Update the server and try again.' ],
+    [ConnectionState.Unavailable]: [ 'HeaderServerUnavailable', () => globalize.translate('MessageUnableToConnectToServer') ]
+};
 
-    const onForceConnect = useCallback(async () => {
-        setIsConnectDisabled(true);
+/** Shown when the saved server cannot be used: it is offline, too old, or no longer the same server. */
+const ConnectionErrorPage: FC<{ state: ConnectionState }> = ({ state }) => {
+    const [ busy, setBusy ] = useState(false);
+    const [ failed, setFailed ] = useState(false);
+    const text = MESSAGES[state];
 
+    if (!text) return null;
+
+    const onConnectAnyway = async () => {
+        setBusy(true);
         try {
-            const server = ServerConnections.getLastUsedServer();
-            await ServerConnections.updateSavedServerId(server);
+            await ServerConnections.updateSavedServerId(ServerConnections.getLastUsedServer());
             window.location.reload();
         } catch (err) {
             console.error('[ConnectionErrorPage] Failed to force connect to server', err);
-            toast(globalize.translate('HeaderConnectionFailure'));
-            setIsConnectDisabled(false);
+            setFailed(true);
+            setBusy(false);
         }
-    }, []);
-
-    useEffect(() => {
-        switch (state) {
-            case ConnectionState.ServerMismatch:
-                setTitle(globalize.translate('HeaderServerMismatch'));
-                setHtmlMessage(undefined);
-                setMessage(globalize.translate('MessageServerMismatch'));
-                return;
-            case ConnectionState.ServerUpdateNeeded:
-                setTitle(globalize.translate('HeaderUpdateRequired'));
-                setHtmlMessage(undefined);
-                setMessage('This server is too old for this client. Update the server and try again.');
-                return;
-            case ConnectionState.Unavailable:
-                setTitle(globalize.translate('HeaderServerUnavailable'));
-                setHtmlMessage(undefined);
-                setMessage(globalize.translate('MessageUnableToConnectToServer'));
-        }
-    }, [ state ]);
-
-    if (!title) return;
+    };
 
     return (
-        <Page
-            id='connectionErrorPage'
-            className='mainAnimatedPage standalonePage'
-            isBackButtonEnabled={false}
-            shouldAutoFocus
-        >
-            <div className='padded-left padded-right'>
-                <h1>{title}</h1>
-                {htmlMessage && (
-                    <p
-                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlMessage) }}
-                        style={{ maxWidth: '80ch' }}
-                    />
-                )}
-                {message && (
-                    <p style={{ maxWidth: '80ch' }}>
-                        {message}
-                    </p>
-                )}
-
-                {appHost.supports(AppFeature.MultiServer) && (
-                    <LinkButton
-                        className='raised'
-                        href='/selectserver'
-                    >
-                        {globalize.translate('ButtonChangeServer')}
-                    </LinkButton>
-                )}
-
+        <div className='tb-app tb-auth'>
+            <div className='tb-auth__card'>
+                <h1 className='tb-auth__title'>{globalize.translate(text[0])}</h1>
+                <div className='tb-notice' role='alert'>{text[1]()}</div>
+                {failed && <div className='tb-notice tb-notice--error' role='alert'>{globalize.translate('HeaderConnectionFailure')}</div>}
                 {state === ConnectionState.ServerMismatch && (
-                    <LinkButton
-                        onClick={onForceConnect}
-                        style={ isConnectDisabled ? { pointerEvents: 'none' } : undefined }
-                    >
+                    <button type='button' className='tb-btn tb-btn--primary tb-btn--block' disabled={busy} onClick={() => { void onConnectAnyway(); }}>
                         {globalize.translate('ConnectAnyway')}
-                    </LinkButton>
+                    </button>
                 )}
+                <Link to='/selectserver' className='tb-btn tb-btn--block'>{globalize.translate('ButtonChangeServer')}</Link>
             </div>
-        </Page>
+        </div>
     );
 };
 

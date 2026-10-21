@@ -42,7 +42,7 @@ const SelectServer: FC = () => {
     };
 
     const remove = async (server: SavedServer) => {
-        await ServerConnections.deleteServer(server.Id);
+        if (server.Id) await ServerConnections.deleteServer(server.Id);
         await queryClient.invalidateQueries({ queryKey: SERVERS_KEY });
     };
 

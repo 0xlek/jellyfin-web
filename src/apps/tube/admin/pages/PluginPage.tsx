@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 
 import AppBody from 'components/AppBody';
 import ServerContentPage from 'components/ServerContentPage';
-import ThemeCss from 'components/ThemeCss';
 import taskButton from 'scripts/taskbutton';
 // Defines the Dashboard global plugin scripts call
 import 'utils/dashboard';
@@ -11,15 +10,7 @@ import 'utils/dashboard';
 import { useDocumentTitle } from '../../hooks';
 
 // The classic form elements plugin pages are written with
-import 'elements/emby-button/emby-button';
-import 'elements/emby-button/paper-icon-button-light';
-import 'elements/emby-checkbox/emby-checkbox';
-import 'elements/emby-collapse/emby-collapse';
-import 'elements/emby-input/emby-input';
-import 'elements/emby-radio/emby-radio';
-import 'elements/emby-select/emby-select';
-import 'elements/emby-textarea/emby-textarea';
-import 'elements/emby-toggle/emby-toggle';
+import 'elements/formElements';
 
 import 'styles/dashboard.scss';
 import '../admin.scss';
@@ -40,7 +31,7 @@ const PluginPage: FC = () => {
             <AppBody>
                 <ServerContentPage view='/web/configurationpage' />
             </AppBody>
-            <ThemeCss dashboard />
+            <link rel='stylesheet' href='themes/dark/theme.css' />
         </div>
     );
 };

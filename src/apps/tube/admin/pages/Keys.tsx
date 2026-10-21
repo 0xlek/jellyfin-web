@@ -5,7 +5,7 @@ import React, { type FC, useState } from 'react';
 import { QUERY_KEY as KEYS_KEY, useApiKeys } from 'apps/tube/admin/data/keys/api/useApiKeys';
 import { useApi } from 'hooks/useApi';
 import globalize from 'lib/globalize';
-import { copy } from 'scripts/clipboard';
+import { copy } from 'utils/clipboard';
 
 import Icon from '../../icons';
 import { AdminPage, Dialog, ErrorNotice, formatDate, Loading, useConfirm } from '../kit';

@@ -3,6 +3,8 @@ import { getSessionApi } from '@jellyfin/sdk/lib/utils/api/session-api';
 import { useQueryClient } from '@tanstack/react-query';
 import classNames from 'classnames';
 import type Hls from 'hls.js';
+
+import { shouldUseHlsJs } from 'utils/deviceProfile';
 import Screenfull from 'screenfull';
 import React, { type FC, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 
@@ -145,7 +147,7 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onTo
                 if (audioIndex === undefined) setSubtitle(initialSubtitle(result.subtitles, prefs));
                 video.addEventListener('loadedmetadata', start, { once: true });
 
-                if (result.isHls && !video.canPlayType('application/vnd.apple.mpegurl')) {
+                if (result.isHls && shouldUseHlsJs()) {
                     const { default: HlsJs } = await import(/* webpackChunkName: "hlsjs" */ 'hls.js');
                     if (cancelled) return;
                     hls = new HlsJs({ startPosition: from ?? -1 });

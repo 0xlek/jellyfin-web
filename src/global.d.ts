@@ -4,8 +4,8 @@ export declare global {
     interface Window {
         ApiClient: ApiClient;
         Events: Events;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        NativeShell: any;
+        Dashboard: typeof import('utils/dashboard').default;
+        TaskButton: typeof import('scripts/taskbutton').default;
         Loading: {
             show();
             hide();

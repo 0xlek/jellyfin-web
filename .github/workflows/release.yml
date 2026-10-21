@@ -67,7 +67,6 @@ jobs:
           # Deep links get the app shell (browser-history routing)
           curl -sf "http://127.0.0.1:8080/web/watch?v=x" | grep -q 'id="reactRoot"'
           curl -sf -o /dev/null http://127.0.0.1:8080/web/themes/dark/theme.css
-          curl -sf -o /dev/null http://127.0.0.1:8080/web/serviceworker.js
 
       - name: Push image
         env:

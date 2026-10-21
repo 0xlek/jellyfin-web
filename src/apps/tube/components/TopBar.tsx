@@ -144,7 +144,7 @@ const UserMenu: FC = () => {
                     <hr />
                     <button role='menuitem' className='tb-menu__item' onClick={() => {
                         close();
-                        logout();
+                        void logout();
                     }}>
                         <Icon name='logout' />{globalize.translate('ButtonSignOut')}
                     </button>

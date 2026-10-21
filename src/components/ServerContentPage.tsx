@@ -4,7 +4,6 @@ import { useLocation } from 'react-router-dom';
 import viewManager from './viewManager/viewManager';
 import globalize from 'lib/globalize';
 import ServerConnections from 'lib/jellyfin-apiclient/ServerConnections';
-import type { RestoreViewFailResponse } from 'types/viewManager';
 
 interface ServerContentPageProps {
     view: string
@@ -30,19 +29,11 @@ const ServerContentPage: FunctionComponent<ServerContentPageProps> = ({ view }) 
             };
 
             viewManager.tryRestoreView(viewOptions)
-                .catch(async (result?: RestoreViewFailResponse) => {
-                    if (!result?.cancelled) {
-                        const apiClient = ServerConnections.currentApiClient();
-
-                        // Fetch the view html from the server and translate it
-                        const viewHtml = await apiClient?.get(apiClient.getUrl(view + location.search))
-                            .then((html: string) => globalize.translateHtml(html));
-
-                        viewManager.loadView({
-                            ...viewOptions,
-                            view: viewHtml
-                        });
-                    }
+                .catch(async () => {
+                    const apiClient = ServerConnections.currentApiClient();
+                    // Fetch the view html from the server and translate it
+                    const html: string | undefined = await apiClient?.get(apiClient.getUrl(view + location.search));
+                    if (html) await viewManager.loadView({ ...viewOptions, view: globalize.translateHtml(html) });
                 });
         };
 

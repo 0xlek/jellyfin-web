@@ -1,5 +1,5 @@
 import React, { type FC, type PropsWithChildren, useEffect } from 'react';
-import viewContainer from './viewContainer';
+import viewManager from './viewManager/viewManager';
 
 /**
  * A simple component that includes the correct structure for ViewManager pages
@@ -8,7 +8,7 @@ import viewContainer from './viewContainer';
 const AppBody: FC<PropsWithChildren<unknown>> = ({ children }) => {
     useEffect(() => () => {
         // Reset view container state on unload
-        viewContainer.reset();
+        viewManager.reset();
     }, []);
 
     return (

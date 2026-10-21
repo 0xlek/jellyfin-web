@@ -1,8 +1,8 @@
 import React, { FunctionComponent, useCallback, useEffect, useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import type { ApiClient, ConnectResponse } from 'jellyfin-apiclient';
+import type { ApiClient } from 'jellyfin-apiclient';
 
-import ServerConnections from 'lib/jellyfin-apiclient/ServerConnections';
+import ServerConnections, { type ConnectResult as ConnectResponse } from 'lib/jellyfin-apiclient/ServerConnections';
 import { ConnectionState } from 'lib/jellyfin-apiclient';
 
 import ConnectionErrorPage from './ConnectionErrorPage';
@@ -93,7 +93,7 @@ const ConnectionRequired: FunctionComponent<ConnectionRequiredProps> = ({
                 } else {
                     console.debug('[ConnectionRequired] not logged in, redirecting to login page', location);
                     const url = encodeURIComponent(location.pathname + location.search);
-                    navigate(`${BounceRoutes.Login}?serverid=${connectionResponse.ApiClient.serverId()}&url=${url}`);
+                    navigate(`${BounceRoutes.Login}?serverid=${connectionResponse.ApiClient?.serverId() ?? ''}&url=${url}`);
                 }
                 return;
             case ConnectionState.ServerSelection:
@@ -134,7 +134,7 @@ const ConnectionRequired: FunctionComponent<ConnectionRequiredProps> = ({
         if (firstConnection.State === ConnectionState.ServerSignIn) {
             // Verify the wizard is complete
             try {
-                const systemInfo = await fetchPublicSystemInfo(firstConnection.ApiClient);
+                const systemInfo = firstConnection.ApiClient && await fetchPublicSystemInfo(firstConnection.ApiClient);
                 if (!systemInfo?.StartupWizardCompleted) {
                     // Update the current ApiClient
                     // TODO: Is there a better place to handle this?

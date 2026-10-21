@@ -4,7 +4,7 @@ import type { DeviceProfile } from '@jellyfin/sdk/lib/generated-client/models/de
 import { PlayMethod } from '@jellyfin/sdk/lib/generated-client/models/play-method';
 import { getMediaInfoApi } from '@jellyfin/sdk/lib/utils/api/media-info-api';
 
-import { appHost } from 'components/apphost';
+import { getDeviceProfile } from 'utils/deviceProfile';
 
 export type SubtitleTrack = { index: number, label: string, language?: string, src: string, isDefault: boolean };
 
@@ -35,7 +35,7 @@ const withApiKey = (api: Api, url: string) => {
  * asks the server for a stream (remuxed when it can) that carries only that track.
  */
 export const getPlaybackSource = async (api: Api, userId: string, item: BaseItemDto, audioStreamIndex?: number): Promise<PlaybackSource> => {
-    const profile: DeviceProfile = await appHost.getDeviceProfile(item);
+    const profile: DeviceProfile = getDeviceProfile();
     const switchingAudio = audioStreamIndex !== undefined;
     const { data } = await getMediaInfoApi(api).getPostedPlaybackInfo({
         itemId: item.Id!,

@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useServerLog } from 'apps/tube/admin/data/logs/api/useServerLog';
 import { useServerLogs } from 'apps/tube/admin/data/logs/api/useServerLogs';
 import globalize from 'lib/globalize';
-import { copy } from 'scripts/clipboard';
+import { copy } from 'utils/clipboard';
 
 import { NumberSetting, Section, SwitchSetting } from '../../components/Form';
 import Icon from '../../icons';

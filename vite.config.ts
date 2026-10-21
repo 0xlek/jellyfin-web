@@ -47,7 +47,8 @@ const standaloneStylesheets = (): Plugin => ({
     name: 'jellyfin:stylesheets',
     configureServer(server: ViteDevServer) {
         server.middlewares.use(async (req, res, next) => {
-            const source = STYLESHEETS[(req.url ?? '').split('?')[0].slice(1)];
+            // Pages ask under the app root, /web/ like in production
+            const source = STYLESHEETS[(req.url ?? '').split('?')[0].replace(/^\/(web\/)?/, '')];
             if (!source) return next();
             try {
                 const { default: css } = await server.ssrLoadModule(`${source}?inline`);
@@ -99,7 +100,7 @@ export default defineConfig(({ command, mode }) => {
                 // Files under src/ are already served by the dev server, so they are only copied into the build
                 ...viteStaticCopy({
                     // The service worker is a small standalone script, registered by URL
-                    targets: [ 'assets', 'config.json', 'robots.txt', 'manifest.json', 'serviceworker.js' ]
+                    targets: [ 'assets', 'config.json', 'robots.txt', 'manifest.json' ]
                         .map(file => ({ src: normalizePath(path.join(SRC, file)), dest: '.' }))
                 }).filter(plugin => plugin.apply !== 'serve'),
                 viteStaticCopy({

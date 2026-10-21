@@ -4,15 +4,9 @@ import React from 'react';
 
 import QueryClientEventHandler from 'components/QueryClientEventHandler';
 import { ApiProvider } from 'hooks/useApi';
-import { UserSettingsProvider } from 'hooks/useUserSettings';
-import { WebConfigProvider } from 'hooks/useWebConfig';
-import browser from 'scripts/browser';
 import { persister, queryClient } from 'utils/query/queryClient';
 
 import RootAppRouter from 'RootAppRouter';
-
-const useReactQueryDevtools = window.Proxy // '@tanstack/query-devtools' requires 'Proxy', which cannot be polyfilled for legacy browsers
-    && !browser.tv; // Don't use devtools on the TV as the navigation is weird
 
 const RootApp = () => (
     <PersistQueryClientProvider
@@ -23,16 +17,10 @@ const RootApp = () => (
         }}
     >
         <ApiProvider>
-            <UserSettingsProvider>
-                <WebConfigProvider>
-                    <QueryClientEventHandler />
-                    <RootAppRouter />
-                </WebConfigProvider>
-            </UserSettingsProvider>
+            <QueryClientEventHandler />
+            <RootAppRouter />
         </ApiProvider>
-        {useReactQueryDevtools && (
-            <ReactQueryDevtools initialIsOpen={false} />
-        )}
+        <ReactQueryDevtools initialIsOpen={false} />
     </PersistQueryClientProvider>
 );
 

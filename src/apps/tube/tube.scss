@@ -423,8 +423,10 @@ html {
     }
 }
 
+/* Phones: the guide is only the overlay drawer, whatever state the inline guide was left in */
 @media (max-width: 791px) {
-    .tb-app {
+    .tb-app,
+    .tb-app.is-guide-collapsed {
         .tb-app__guide {
             display: none;
         }
@@ -1300,6 +1302,7 @@ html {
 .tb-time {
     padding: 0 8px;
     font-size: 13px;
+    white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
 
@@ -1370,13 +1373,24 @@ html {
         display: none;
     }
 
+    .tb-page.tb-watch,
     .tb-watch__layout {
         padding: 0;
+    }
+
+    /* The player runs edge to edge; theater mode has nothing wider to bleed into */
+    .tb-watch.is-theater .tb-watch__frame {
+        margin: 0;
     }
 
     .tb-watch__primary,
     .tb-watch__secondary {
         padding: 0 12px;
+    }
+
+    .tb-watch__title {
+        font-size: 17px;
+        line-height: 24px;
     }
 
     .tb-player {
