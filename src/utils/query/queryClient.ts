@@ -30,7 +30,8 @@ const queryCache = new QueryCache({
                 // If a query fails due to authorization, cancel it and remove it from the cache to prevent showing
                 // unauthorized data.
                 void queryClient.cancelQueries({ queryKey });
-                queryClient.setQueryData(queryKey, null);
+                // Removing (rather than nulling) the entry also makes the next mount fetch it again
+                queryClient.removeQueries({ queryKey, exact: true });
             } catch (e) {
                 console.warn('[QueryCache] failed to remove unauthorized data', e);
             }

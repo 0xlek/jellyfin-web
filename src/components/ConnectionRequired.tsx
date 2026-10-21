@@ -27,6 +27,9 @@ enum BounceRoutes {
     StartWizard = '/wizard/start'
 }
 
+/** Public pages reached from the sign-in page; opening one directly must not bounce back to it. */
+const SIGN_IN_FLOW = [ '/selectserver', '/addserver', '/forgotpassword', '/forgotpasswordpin' ];
+
 type ConnectionRequiredProps = {
     level?: AccessLevelValue
 };
@@ -79,8 +82,8 @@ const ConnectionRequired: FunctionComponent<ConnectionRequiredProps> = ({
                 navigate(BounceRoutes.Home);
                 return;
             case ConnectionState.ServerSignIn:
-                // Bounce to the login page
-                if (location.pathname === BounceRoutes.Login) {
+                // Bounce to the login page, unless this already is a page of the sign-in flow
+                if (location.pathname === BounceRoutes.Login || SIGN_IN_FLOW.includes(location.pathname)) {
                     setIsLoading(false);
                 } else {
                     console.debug('[ConnectionRequired] not logged in, redirecting to login page', location);
@@ -90,6 +93,11 @@ const ConnectionRequired: FunctionComponent<ConnectionRequiredProps> = ({
                 return;
             case ConnectionState.ServerSelection:
                 // Bounce to select server page
+                // Adding a server or resetting a password needs no server picked yet
+                if (SIGN_IN_FLOW.includes(location.pathname)) {
+                    setIsLoading(false);
+                    return;
+                }
                 console.debug('[ConnectionRequired] redirecting to select server page');
                 navigateIfNotThere(BounceRoutes.SelectServer);
                 return;

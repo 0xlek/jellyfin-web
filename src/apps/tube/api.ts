@@ -9,6 +9,7 @@ import type { LibraryApiGetItemsRequest } from '@jellyfin/sdk/lib/generated-clie
 import { getGenreApi } from '@jellyfin/sdk/lib/utils/api/genre-api';
 import { getLibraryApi } from '@jellyfin/sdk/lib/utils/api/library-api';
 import { getShowApi } from '@jellyfin/sdk/lib/utils/api/show-api';
+import { getUserApi } from '@jellyfin/sdk/lib/utils/api/user-api';
 import { getUserDataApi } from '@jellyfin/sdk/lib/utils/api/user-data-api';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -336,5 +337,18 @@ export const useCollectionOf = (item?: BaseItemDto) => {
             return { folder: parent, subtitle: grandparent?.Type === BaseItemKind.Folder ? grandparent.Name ?? undefined : undefined };
         },
         enabled: !!api && !!user?.Id && item?.Type === BaseItemKind.Video
+    });
+};
+
+export const CURRENT_USER_KEY = [ TUBE_KEY, 'CurrentUser' ];
+
+/** The signed-in user, refetched after settings change it (avatar, configuration). */
+export const useCurrentUser = () => {
+    const { api, user } = useApi();
+    return useQuery({
+        queryKey: [ ...CURRENT_USER_KEY, user?.Id ],
+        queryFn: async ({ signal }) => (await getUserApi(api!).getCurrentUser({ signal })).data,
+        initialData: user,
+        enabled: !!api && !!user?.Id
     });
 };

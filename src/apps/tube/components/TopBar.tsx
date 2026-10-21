@@ -7,7 +7,7 @@ import { useApi } from 'hooks/useApi';
 import globalize from 'lib/globalize';
 import Dashboard from 'utils/dashboard';
 
-import { useSearchSuggestions } from '../api';
+import { useCurrentUser, useSearchSuggestions } from '../api';
 import { useDebounced, useDismiss, isTyping } from '../hooks';
 import Icon from '../icons';
 import { itemLink } from '../utils';
@@ -114,7 +114,8 @@ const SearchBox: FC = () => {
 };
 
 const UserMenu: FC = () => {
-    const { api, user } = useApi();
+    const { api } = useApi();
+    const { data: user } = useCurrentUser();
     const [ open, setOpen ] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
     const close = useCallback(() => setOpen(false), []);
@@ -132,7 +133,7 @@ const UserMenu: FC = () => {
             {open && (
                 <div className='tb-menu' role='menu'>
                     <div className='tb-menu__header'>{user?.Name}</div>
-                    <Link role='menuitem' className='tb-menu__item' to='/mypreferencesmenu' onClick={close}>
+                    <Link role='menuitem' className='tb-menu__item' to='/settings' onClick={close}>
                         <Icon name='settings' />{globalize.translate('Settings')}
                     </Link>
                     {user?.Policy?.IsAdministrator && (
