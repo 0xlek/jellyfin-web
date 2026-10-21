@@ -15,6 +15,8 @@ const fetchConfigurationPages = async (
 ) => {
     const response = await getPluginApi(api)
         .getConfigurationPages(params, options);
+    // A proxy that sends /web/* to a static client answers with its HTML page instead of the list
+    if (!Array.isArray(response.data)) throw new Error('Configuration pages response is not a list');
     return response.data;
 };
 
