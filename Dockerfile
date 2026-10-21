@@ -2,7 +2,7 @@
 # Base images are pinned by digest. Official images are rebuilt for OS patches, so they are
 # exempt from the 7-day minimum age that applies to dependencies.
 FROM node:24.22.0-alpine3.24@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS build
-# CI passes the in-cluster npm cache (Verdaccio). The lockfile's integrity hashes still verify every package.
+# CI passes its npm registry. The lockfile's integrity hashes still verify every package.
 ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org/
 # npm reads npm_config_registry; pnpm 11 reads only pnpm_config_registry.
 ENV npm_config_registry=${NPM_CONFIG_REGISTRY} pnpm_config_registry=${NPM_CONFIG_REGISTRY}

@@ -8,13 +8,17 @@ on:
 permissions:
   contents: read
 
-# Self-hosted ARC scale set (ghrunner-arc, cluster/terraform.tfvars key "jellyfin-web").
-# Runner pods route npm through the in-cluster Verdaccio cache; lockfile hashes still apply.
-
 jobs:
   checks:
     runs-on: jellyfin-web
     steps:
+      # Keep the runner's internal addresses out of the public logs
+      - run: |
+          for url in "$npm_config_registry" "$LOCAL_S3_ENDPOINT"; do
+            [ -n "$url" ] || continue
+            host=${url#*://}; host=${host%%/*}
+            echo "::add-mask::$url"; echo "::add-mask::$host"; echo "::add-mask::${host%%:*}"
+          done
       # Actions are pinned to commit SHAs; tags can be moved by whoever controls the action repo.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

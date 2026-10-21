@@ -19,6 +19,13 @@ jobs:
       IMAGE: ghcr.io/${{ github.repository }}
       CANDIDATE: jellyfin-web:candidate
     steps:
+      # Keep the runner's internal addresses out of the public logs
+      - run: |
+          for url in "$npm_config_registry" "$LOCAL_S3_ENDPOINT"; do
+            [ -n "$url" ] || continue
+            host=${url#*://}; host=${host%%/*}
+            echo "::add-mask::$url"; echo "::add-mask::$host"; echo "::add-mask::${host%%:*}"
+          done
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -37,12 +44,12 @@ jobs:
 
       - name: Build image
         run: |
-          # Layers are cached in the runners' local S3 (Garage, LOCAL_S3_* from the runner environment)
+          # Layers are cached in the runners' S3 (LOCAL_S3_* from the runner environment)
           docker buildx create --name ci --driver docker-container --use \
             --driver-opt network=host \
             --driver-opt image=moby/buildkit:v0.33.0@sha256:6c2fa84a6b61ccd72899dde4239f8d5717f05f9a8ca6f3cad185fb1a95a94de3
           cache="type=s3,bucket=buildkit,name=jellyfin-web,region=$LOCAL_S3_REGION,endpoint_url=$LOCAL_S3_ENDPOINT,use_path_style=true,access_key_id=$LOCAL_S3_ACCESS_KEY_ID,secret_access_key=$LOCAL_S3_SECRET_ACCESS_KEY"
-          # The host network reaches the in-cluster npm cache set in the runner's environment
+          # The host network reaches the npm registry set in the runner's environment
           docker buildx build --platform linux/amd64 --pull --network host --load -t "$CANDIDATE" \
             --cache-from "$cache" --cache-to "$cache,mode=max" \
             --build-arg NPM_CONFIG_REGISTRY="$npm_config_registry" \
