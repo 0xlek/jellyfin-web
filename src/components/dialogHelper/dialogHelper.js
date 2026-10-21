@@ -1,7 +1,6 @@
 import focusManager from '../focusManager';
 import browser from '../../scripts/browser';
 import layoutManager from '../layoutManager';
-import inputManager from '../../scripts/inputManager';
 import { toBoolean } from '../../utils/string.ts';
 import { hide } from '../loading/loading.ts';
 import dom from '../../utils/dom';
@@ -82,7 +81,7 @@ function DialogHashHandler(dlg, hash, resolve) {
     }
 
     function onBackCommand(e) {
-        if (e.detail.command === 'back') {
+        if (e.key === 'Escape') {
             e.preventDefault();
             e.stopPropagation();
             close(dlg);
@@ -91,7 +90,7 @@ function DialogHashHandler(dlg, hash, resolve) {
 
     function onDialogClosed() {
         if (!isHistoryEnabled(dlg)) {
-            inputManager.off(dlg, onBackCommand);
+            dlg.removeEventListener('keydown', onBackCommand);
         }
 
         if (unlisten) {
@@ -192,7 +191,7 @@ function DialogHashHandler(dlg, hash, resolve) {
 
         unlisten = history.listen(onHashChange);
     } else {
-        inputManager.on(dlg, onBackCommand);
+        dlg.addEventListener('keydown', onBackCommand);
     }
 }
 

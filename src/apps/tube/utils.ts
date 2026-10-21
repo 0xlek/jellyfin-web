@@ -109,3 +109,17 @@ export const playedPercent = (item: BaseItemDto) => {
     if (item.UserData?.Played) return 100;
     return item.UserData?.PlayedPercentage ?? 0;
 };
+
+const readAsBase64 = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+    reader.onerror = () => reject(reader.error ?? new Error('Unable to read the image'));
+    reader.readAsDataURL(file);
+});
+
+/** Image endpoints take the file as a base64 body with the image's own content type, which the SDK cannot send. */
+export const uploadImage = async (api: Api, path: string, file: File) => {
+    await api.axiosInstance.post(`${api.basePath}${path}`, await readAsBase64(file), {
+        headers: { 'Content-Type': file.type, Authorization: api.authorizationHeader }
+    });
+};

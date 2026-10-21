@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { type FC, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-import { ServerConnections } from 'lib/jellyfin-apiclient';
+import ServerConnections from 'lib/jellyfin-apiclient/ServerConnections';
 import globalize from 'lib/globalize';
 
 import { useDocumentTitle } from '../hooks';

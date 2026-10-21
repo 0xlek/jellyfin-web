@@ -1,7 +1,8 @@
 import React, { type FC, type FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { ConnectionState, ServerConnections } from 'lib/jellyfin-apiclient';
+import ServerConnections from 'lib/jellyfin-apiclient/ServerConnections';
+import { ConnectionState } from 'lib/jellyfin-apiclient';
 import globalize from 'lib/globalize';
 
 import { useDocumentTitle } from '../hooks';

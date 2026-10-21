@@ -4,6 +4,8 @@ import { Navigate, type RouteObject } from 'react-router-dom';
 import ConnectionRequired from 'components/ConnectionRequired';
 import ErrorBoundary from 'components/router/ErrorBoundary';
 
+import { ADMIN_ROUTES } from './admin/routes';
+
 /** Old settings pages, now sections of /settings. */
 const SETTINGS_REDIRECTS: Record<string, string> = {
     mypreferencesmenu: '',
@@ -16,11 +18,11 @@ const SETTINGS_REDIRECTS: Record<string, string> = {
     quickconnect: '#quickconnect'
 };
 
-const AUTH_PATHS = [ 'login', 'selectserver', 'addserver', 'forgotpassword', 'forgotpasswordpin' ];
+const AUTH_PATHS = [ 'login', 'selectserver', 'addserver', 'forgotpassword', 'forgotpasswordpin', 'wizard' ];
 
 /** Top-level paths owned by this app; the root layout hides the legacy header on them. */
 export const TUBE_PATHS = [
-    'home', 'watch', 'results', 'library', 'series', 'feed', 'collection', 'details', 'settings',
+    'home', 'watch', 'results', 'library', 'series', 'feed', 'collection', 'details', 'settings', 'dashboard', 'configurationpage',
     ...AUTH_PATHS,
     ...Object.keys(SETTINGS_REDIRECTS)
 ];
@@ -49,6 +51,14 @@ export const TUBE_ROUTES: RouteObject[] = [
                         element: <Navigate replace to={`/settings${section}`} />
                     }))
                 ]
+            },
+            {
+                element: <ConnectionRequired level='admin' />,
+                ErrorBoundary,
+                children: [
+                    { path: 'dashboard', children: ADMIN_ROUTES },
+                    { path: 'configurationpage', lazy: page(() => import('./admin/pages/PluginPage')) }
+                ]
             }
         ]
     },
@@ -64,6 +74,13 @@ export const TUBE_ROUTES: RouteObject[] = [
                     { path: 'addserver', lazy: page(() => import('./auth/AddServer')) },
                     { path: 'forgotpassword', lazy: page(() => import('./auth/ForgotPassword')) },
                     { path: 'forgotpasswordpin', lazy: page(() => import('./auth/ResetPassword')) }
+                ]
+            },
+            {
+                element: <ConnectionRequired level='wizard' />,
+                ErrorBoundary,
+                children: [
+                    { path: 'wizard/:step?', lazy: page(() => import('./wizard/Wizard')) }
                 ]
             }
         ]

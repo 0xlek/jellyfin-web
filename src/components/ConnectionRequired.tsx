@@ -2,7 +2,8 @@ import React, { FunctionComponent, useCallback, useEffect, useState } from 'reac
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { ApiClient, ConnectResponse } from 'jellyfin-apiclient';
 
-import { ConnectionState, ServerConnections } from 'lib/jellyfin-apiclient';
+import ServerConnections from 'lib/jellyfin-apiclient/ServerConnections';
+import { ConnectionState } from 'lib/jellyfin-apiclient';
 
 import ConnectionErrorPage from './ConnectionErrorPage';
 import Loading from './loading/LoadingComponent';
@@ -65,14 +66,18 @@ const ConnectionRequired: FunctionComponent<ConnectionRequiredProps> = ({
     const location = useLocation();
 
     const [ errorState, setErrorState ] = useState<ConnectionState>();
-    const [ isLoading, setIsLoading ] = useState(true);
+    // The level that passed its checks. React reuses this component when navigating between route groups of
+    // different levels, so a plain flag would let an admin page render before the admin check has run.
+    const [ passedLevel, setPassedLevel ] = useState<string>();
+    const isLoading = passedLevel !== level;
+    const setIsLoading = useCallback((loading: boolean) => setPassedLevel(loading ? undefined : level), [ level ]);
 
     const navigateIfNotThere = useCallback((route: BounceRoutes) => {
-        // If we try to navigate to the current route, just set isLoading = false
+        // If we try to navigate to the current route, the check has passed
         if (location.pathname === route) setIsLoading(false);
         // Otherwise navigate to the route
         else navigate(route);
-    }, [ location.pathname, navigate ]);
+    }, [ location.pathname, navigate, setIsLoading ]);
 
     const bounce = useCallback(async (connectionResponse: ConnectResponse) => {
         switch (connectionResponse.State) {
@@ -105,7 +110,7 @@ const ConnectionRequired: FunctionComponent<ConnectionRequiredProps> = ({
 
         console.warn('[ConnectionRequired] unhandled connection state', connectionResponse.State);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ navigateIfNotThere, location.pathname, navigate ]);
+    }, [ navigateIfNotThere, location.pathname, navigate, setIsLoading ]);
 
     const handleWizard = useCallback(async (firstConnection: ConnectResponse | null) => {
         const apiClient = firstConnection?.ApiClient || ServerConnections.currentApiClient();
@@ -123,7 +128,7 @@ const ConnectionRequired: FunctionComponent<ConnectionRequiredProps> = ({
         // Update the current ApiClient
         ServerConnections.setLocalApiClient(apiClient);
         setIsLoading(false);
-    }, [ navigate ]);
+    }, [ navigate, setIsLoading ]);
 
     const handleIncompleteWizard = useCallback(async (firstConnection: ConnectResponse) => {
         if (firstConnection.State === ConnectionState.ServerSignIn) {
@@ -188,7 +193,7 @@ const ConnectionRequired: FunctionComponent<ConnectionRequiredProps> = ({
         }
 
         setIsLoading(false);
-    }, [bounce, level]);
+    }, [ bounce, level, setIsLoading ]);
 
     useEffect(() => {
         // Check connection status on initial page load

@@ -1,5 +1,4 @@
 import dialog from 'components/dialog/dialog';
-import { appRouter } from 'components/router/appRouter';
 import globalize from 'lib/globalize';
 
 interface OptionItem {
@@ -40,8 +39,6 @@ async function confirm(options: string | ConfirmOptions, title: string = '') {
     });
 
     options.buttons = items;
-
-    await appRouter.ready();
 
     return dialog.show(options).then(result => {
         if (result === 'ok') {

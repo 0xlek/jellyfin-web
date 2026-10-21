@@ -4,9 +4,11 @@ import { Outlet, ScrollRestoration, useLocation } from 'react-router-dom';
 
 import TopBar from './components/TopBar';
 import Sidebar from './components/Sidebar';
+import AdminNav from './admin/AdminNav';
 import { useStoredState } from './hooks';
 
 import './tube.scss';
+import './forms.scss';
 
 /** Above this width the guide sits inline and the menu button toggles full/mini; below it, it is an overlay drawer. */
 const WIDE_QUERY = '(min-width: 1313px)';
@@ -17,6 +19,8 @@ export const Component = () => {
     const [ drawerOpen, setDrawerOpen ] = useState(false);
     // The watch page gives the player the full width, like YouTube; its guide is always the drawer
     const isWatch = location.pathname === '/watch';
+    const isAdmin = location.pathname === '/dashboard' || location.pathname.startsWith('/dashboard/') || location.pathname === '/configurationpage';
+    const Guide = isAdmin ? AdminNav : Sidebar;
 
     useEffect(() => setDrawerOpen(false), [ location.pathname, location.search ]);
 
@@ -38,14 +42,14 @@ export const Component = () => {
             <TopBar onMenuClick={onMenuClick} />
             {!isWatch && (
                 <div className='tb-app__guide'>
-                    <Sidebar />
+                    <Guide />
                 </div>
             )}
             {drawerOpen && (
                 <div className='tb-drawer'>
                     <button className='tb-drawer__scrim' aria-label='Close menu' onClick={closeDrawer} />
                     <div className='tb-drawer__panel'>
-                        <Sidebar onNavigate={closeDrawer} />
+                        <Guide onNavigate={closeDrawer} />
                     </div>
                 </div>
             )}

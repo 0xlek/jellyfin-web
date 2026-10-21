@@ -3,7 +3,7 @@ import React, { AnchorHTMLAttributes, DetailedHTMLProps, MouseEvent, useCallback
 
 import { appHost } from 'components/apphost';
 import layoutManager from 'components/layoutManager';
-import { appRouter } from 'components/router/appRouter';
+import { navigate } from 'utils/navigate';
 import { AppFeature } from 'constants/appFeature';
 import shell from 'scripts/shell';
 
@@ -37,10 +37,7 @@ const LinkButton: React.FC<LinkButtonProps> = ({
                 }
             } else {
                 e.preventDefault();
-                appRouter.show(url)
-                    .catch(err => {
-                        console.error('[LinkButton] failed to show url', url, err);
-                    });
+                navigate(url);
             }
         } else {
             e.preventDefault();

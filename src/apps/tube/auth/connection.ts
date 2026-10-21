@@ -1,7 +1,8 @@
 import type { Api } from '@jellyfin/sdk';
 import type { NavigateFunction } from 'react-router-dom';
 
-import { ConnectionState, ServerConnections } from 'lib/jellyfin-apiclient';
+import ServerConnections from 'lib/jellyfin-apiclient/ServerConnections';
+import { ConnectionState } from 'lib/jellyfin-apiclient';
 import globalize from 'lib/globalize';
 import appSettings from 'scripts/settings/appSettings';
 

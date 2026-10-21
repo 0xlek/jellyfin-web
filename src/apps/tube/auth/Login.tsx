@@ -5,7 +5,7 @@ import markdownIt from 'markdown-it';
 import React, { type FC, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
-import { ServerConnections } from 'lib/jellyfin-apiclient';
+import ServerConnections from 'lib/jellyfin-apiclient/ServerConnections';
 import globalize from 'lib/globalize';
 import appSettings from 'scripts/settings/appSettings';
 import { getAuthenticationApi } from 'utils/sdk/authentication-api';

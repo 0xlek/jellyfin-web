@@ -1,0 +1,515 @@
+/* Server administration pages, in the tube design */
+
+.tb-app {
+    .tb-guide--admin section + section {
+        display: block;
+    }
+
+    .tb-admin {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding-bottom: 96px;
+    }
+
+    .tb-admin__back {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 16px;
+        color: var(--tb-text-2);
+
+        svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        &:hover {
+            color: var(--tb-text);
+        }
+    }
+
+    .tb-admin__header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px 16px;
+        padding-bottom: 8px;
+    }
+
+    .tb-admin__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .tb-admin__form {
+        display: flex;
+        flex-direction: column;
+        gap: 40px;
+        max-width: 860px;
+    }
+
+    .tb-admin__loading {
+        width: 32px;
+        height: 32px;
+        margin: 48px auto;
+        border: 3px solid var(--tb-active);
+        border-top-color: var(--tb-text);
+        border-radius: 50%;
+        animation: tb-spin 0.8s linear infinite;
+    }
+
+    .tb-tabs {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 24px;
+        overflow-x: auto;
+        border-bottom: 1px solid var(--tb-border);
+        scrollbar-width: none;
+    }
+
+    .tb-tabs__tab {
+        flex-shrink: 0;
+        padding: 10px 14px;
+        color: var(--tb-text-2);
+        font-weight: 500;
+        box-shadow: inset 0 -2px 0 transparent;
+
+        &:hover {
+            color: var(--tb-text);
+        }
+
+        &.active {
+            color: var(--tb-text);
+            box-shadow: inset 0 -2px 0 var(--tb-text);
+        }
+    }
+
+    .tb-input-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        .tb-input {
+            flex: 1;
+            min-width: 0;
+        }
+    }
+
+    .tb-setting--wide .tb-setting__control {
+        width: min(420px, 55%);
+    }
+
+    textarea.tb-input {
+        height: auto;
+        min-height: 120px;
+        padding: 12px 14px;
+        resize: vertical;
+        font-family: ui-monospace, monospace;
+        font-size: 13px;
+    }
+
+    .tb-btn--danger-fill {
+        background: #c62828;
+        color: #fff;
+
+        &:hover {
+            background: #b71c1c;
+        }
+    }
+
+    /* Unsaved changes */
+
+    .tb-savebar {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        z-index: 60;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 8px 8px 20px;
+        border-radius: 28px;
+        background: var(--tb-surface-2);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+        transform: translateX(-50%);
+        white-space: nowrap;
+        animation: tb-fade 0.15s ease;
+
+        > span {
+            margin-right: 8px;
+        }
+
+        &.is-error {
+            background: #5c1f1f;
+            white-space: normal;
+        }
+    }
+
+    /* Dialogs */
+
+    .tb-dialog {
+        box-sizing: border-box;
+        width: min(480px, calc(100vw - 32px));
+        max-height: calc(100dvh - 32px);
+        padding: 24px;
+        border: 0;
+        border-radius: 16px;
+        background: var(--tb-surface);
+        color: var(--tb-text);
+        overflow: auto;
+
+        &::backdrop {
+            background: rgba(0, 0, 0, 0.6);
+        }
+    }
+
+    .tb-dialog--wide {
+        width: min(720px, calc(100vw - 32px));
+    }
+
+    .tb-dialog__title {
+        margin-bottom: 16px;
+        font-size: 20px;
+        font-weight: 700;
+    }
+
+    .tb-dialog__body {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        color: var(--tb-text);
+    }
+
+    .tb-dialog__actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 24px;
+    }
+
+    .tb-picker {
+        display: flex;
+        flex-direction: column;
+        height: min(360px, 50vh);
+        overflow-y: auto;
+
+        .tb-list__item {
+            min-height: 44px;
+            cursor: pointer;
+        }
+    }
+
+    /* Tables */
+
+    .tb-table-wrap {
+        overflow-x: auto;
+    }
+
+    .tb-table {
+        width: 100%;
+        border-collapse: collapse;
+
+        th,
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--tb-border);
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        th {
+            color: var(--tb-text-2);
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        tbody tr:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .tb-table__num {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .tb-table__actions {
+            width: 1%;
+            text-align: right;
+            white-space: nowrap;
+        }
+    }
+
+    /* Cards and stats */
+
+    .tb-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+    }
+
+    .tb-card {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-width: 0;
+        padding: 16px;
+        border-radius: var(--tb-radius);
+        background: var(--tb-surface);
+    }
+
+    .tb-card__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }
+
+    .tb-card__title {
+        font-size: 16px;
+        font-weight: 600;
+        overflow-wrap: anywhere;
+    }
+
+    .tb-card__meta {
+        color: var(--tb-text-2);
+        font-size: 13px;
+        overflow-wrap: anywhere;
+    }
+
+    .tb-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 12px;
+    }
+
+    .tb-stat {
+        padding: 14px 16px;
+        border-radius: var(--tb-radius);
+        background: var(--tb-surface);
+
+        strong {
+            display: block;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        span {
+            color: var(--tb-text-2);
+            font-size: 13px;
+        }
+    }
+
+    .tb-progress {
+        height: 4px;
+        overflow: hidden;
+        border-radius: 2px;
+        background: var(--tb-active);
+
+        > span {
+            display: block;
+            height: 100%;
+            background: var(--tb-accent);
+            transition: width 0.3s ease;
+        }
+    }
+
+    .tb-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        background: var(--tb-active);
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .tb-badge--accent {
+        background: rgba(0, 164, 220, 0.2);
+        color: #6fd3f5;
+    }
+
+    .tb-badge--warn {
+        background: rgba(255, 167, 38, 0.2);
+        color: #ffcc80;
+    }
+
+    .tb-badge--error {
+        background: rgba(255, 82, 82, 0.2);
+        color: #ff8a80;
+    }
+
+    .tb-checks {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 10px 16px;
+        padding: 12px 0;
+    }
+
+    .tb-log {
+        margin: 0;
+        padding: 16px;
+        overflow: auto;
+        border-radius: var(--tb-radius);
+        background: #000;
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        white-space: pre;
+    }
+
+    @media (max-width: 720px) {
+        .tb-setting--wide .tb-setting__control {
+            width: 100%;
+        }
+
+        .tb-setting--wide {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+        }
+
+        .tb-savebar {
+            right: 16px;
+            left: 16px;
+            justify-content: flex-end;
+            transform: none;
+        }
+    }
+
+    .tb-dialog__body p {
+        white-space: pre-line;
+    }
+
+    .tb-library__thumb {
+        position: relative;
+        display: grid;
+        aspect-ratio: 16 / 9;
+        place-items: center;
+        background: var(--tb-surface-2);
+        color: var(--tb-text-2);
+
+        img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        svg {
+            width: 48px;
+            height: 48px;
+        }
+    }
+
+    .tb-library__progress {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        border-radius: 0;
+    }
+
+    .tb-order {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .tb-order__item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 40px;
+        padding: 0 4px 0 12px;
+        border-radius: 10px;
+        background: var(--tb-surface);
+
+        .tb-icon-btn {
+            width: 32px;
+            height: 32px;
+
+            &:disabled {
+                opacity: 0.3;
+            }
+
+            svg {
+                width: 18px;
+                height: 18px;
+            }
+        }
+    }
+
+    .tb-pager {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 4px;
+        padding: 12px 0;
+
+        .tb-icon-btn:disabled {
+            opacity: 0.3;
+        }
+    }
+
+    /* Plugin settings pages are classic view-manager pages: lay them out in the normal flow */
+    .tb-plugin-page {
+        .mainAnimatedPages {
+            position: relative;
+        }
+
+        .mainAnimatedPage {
+            position: relative;
+            inset: auto;
+            contain: none !important;
+        }
+
+        .content-primary {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 16px 24px 96px !important;
+            background: none;
+        }
+
+        .emby-input,
+        .emby-select,
+        .emby-textarea {
+            box-sizing: border-box;
+            width: 100%;
+            min-height: 44px;
+            padding: 0 14px;
+            border: 0;
+            border-radius: 10px;
+            background: var(--tb-surface-2);
+            color: var(--tb-text);
+            font: inherit;
+        }
+
+        .emby-textarea {
+            padding: 12px 14px;
+        }
+
+        .inputContainer,
+        .selectContainer {
+            margin-bottom: 1.5em;
+        }
+    }
+
+    .tb-wizard__steps {
+        display: flex;
+        gap: 6px;
+
+        span {
+            flex: 1;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--tb-active);
+
+            &.is-done {
+                background: var(--tb-accent);
+            }
+        }
+    }
+}

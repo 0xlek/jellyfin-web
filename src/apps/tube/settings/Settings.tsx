@@ -4,7 +4,7 @@ import { getImageApi } from '@jellyfin/sdk/lib/utils/api/image-api';
 import { getLocalizationApi } from '@jellyfin/sdk/lib/utils/api/localization-api';
 import { getUserApi } from '@jellyfin/sdk/lib/utils/api/user-api';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import React, { type FC, type FormEvent, type PropsWithChildren, type ReactNode, useEffect, useRef, useState } from 'react';
+import React, { type FC, type FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 import Page from 'components/Page';
@@ -15,12 +15,12 @@ import Dashboard from 'utils/dashboard';
 import { getAuthenticationApi } from 'utils/sdk/authentication-api';
 
 import { CURRENT_USER_KEY, useCurrentUser } from '../api';
+import { Section, Setting, useSavedFlash } from '../components/Form';
+import { uploadImage } from '../utils';
 import { useDocumentTitle } from '../hooks';
 import { DISPLAY_LANGUAGES } from './languages';
 
 import '../forms.scss';
-
-const SAVED_MS = 2000;
 
 const SECTIONS = [
     { id: 'account', label: () => globalize.translate('Profile') },
@@ -37,43 +37,6 @@ const SUBTITLE_MODES: { value: SubtitlePlaybackMode, label: string, help: string
     { value: SubtitlePlaybackMode.None, label: 'None', help: 'NoSubtitlesHelp' }
 ];
 
-const Section: FC<PropsWithChildren<{ id: string, title: string, status?: ReactNode }>> = ({ id, title, status, children }) => (
-    <section id={id} className='tb-settings__section'>
-        <h2>{title} {status}</h2>
-        {children}
-    </section>
-);
-
-const Setting: FC<PropsWithChildren<{ label: string, help?: string, htmlFor?: string }>> = ({ label, help, htmlFor, children }) => (
-    <div className='tb-setting'>
-        <div className='tb-setting__text'>
-            <label className='tb-setting__label' htmlFor={htmlFor}>{label}</label>
-            {help && <span className='tb-setting__help'>{help}</span>}
-        </div>
-        <div className='tb-setting__control'>{children}</div>
-    </div>
-);
-
-/** "Saved" next to a section title for a moment after each change. */
-const useSavedFlash = () => {
-    const [ saved, setSaved ] = useState(false);
-    const timer = useRef<number>();
-    useEffect(() => () => window.clearTimeout(timer.current), []);
-    const flash = () => {
-        setSaved(true);
-        window.clearTimeout(timer.current);
-        timer.current = window.setTimeout(() => setSaved(false), SAVED_MS);
-    };
-    return [ saved ? <span key='saved' className='tb-setting__help' role='status'>{globalize.translate('SettingsSaved')}</span> : null, flash ] as const;
-};
-
-const readAsBase64 = (file: File) => new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
-    reader.onerror = () => reject(reader.error ?? new Error('Unable to read the image'));
-    reader.readAsDataURL(file);
-});
-
 const Account: FC = () => {
     const { api } = useApi();
     const queryClient = useQueryClient();
@@ -88,10 +51,7 @@ const Account: FC = () => {
 
     const upload = useMutation({
         mutationFn: async (file: File) => {
-            // The server reads the image body as base64 text
-            await api!.axiosInstance.post(`${api!.basePath}/Users/${user!.Id}/Images/Primary`, await readAsBase64(file), {
-                headers: { 'Content-Type': file.type, Authorization: api!.authorizationHeader }
-            });
+            await uploadImage(api!, `/Users/${user!.Id}/Images/Primary`, file);
         },
         onSuccess: refreshUser,
         onError: () => setMessage({ text: globalize.translate('ImageUploadFailed'), error: true })

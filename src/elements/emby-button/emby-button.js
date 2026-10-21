@@ -2,10 +2,10 @@ import 'webcomponents.js/webcomponents-lite';
 
 import { appHost } from 'components/apphost';
 import layoutManager from 'components/layoutManager';
-import { appRouter } from 'components/router/appRouter';
 import { AppFeature } from 'constants/appFeature';
 import { removeEventListener, addEventListener } from 'utils/dom';
 import shell from 'scripts/shell';
+import { navigate } from 'utils/navigate';
 
 import './emby-button.scss';
 
@@ -22,7 +22,7 @@ function onAnchorClick(e) {
             }
         } else {
             e.preventDefault();
-            appRouter.show(href);
+            navigate(href);
         }
     } else {
         e.preventDefault();

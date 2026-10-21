@@ -1,7 +1,7 @@
 import { getDisplayPreferencesQuery } from 'hooks/api/useDisplayPreferences';
 import { getUserQuery } from 'hooks/api/useUser';
 import { QUERY_KEY } from 'hooks/useUsers';
-import { ServerConnections } from 'lib/jellyfin-apiclient';
+import ServerConnections from 'lib/jellyfin-apiclient/ServerConnections';
 import { StillWatchingOptions } from 'plugins/stillWatching/constants';
 import Events from 'utils/events';
 import { queryClient } from 'utils/query/queryClient';

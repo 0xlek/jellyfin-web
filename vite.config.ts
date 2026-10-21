@@ -12,16 +12,6 @@ const SRC = path.resolve(__dirname, 'src');
 const NODE_MODULES = path.resolve(__dirname, 'node_modules');
 
 /** Files served as-is from the libraries folder, mostly workers that are loaded by URL at runtime. */
-const LIBRARIES = [
-    'libarchive.js/dist/worker-bundle.js',
-    'libarchive.js/dist/libarchive.wasm',
-    '@jellyfin/libass-wasm/dist/js/default.woff2',
-    '@jellyfin/libass-wasm/dist/js/subtitles-octopus-worker.js',
-    '@jellyfin/libass-wasm/dist/js/subtitles-octopus-worker.wasm',
-    '@jellyfin/libass-wasm/dist/js/subtitles-octopus-worker-legacy.js',
-    'pdfjs-dist/build/pdf.worker.js'
-];
-
 /** Themes are built as standalone stylesheets (themes/<id>/theme.css) that the app swaps with a <link>. */
 const STYLESHEETS: Record<string, string> = Object.fromEntries(
     globSync('themes/*/theme.scss', { cwd: SRC }).map(file => [ `${path.dirname(file)}/theme.css`, path.join(SRC, file) ])
@@ -114,8 +104,7 @@ export default defineConfig(({ command, mode }) => {
                 }).filter(plugin => plugin.apply !== 'serve'),
                 viteStaticCopy({
                     targets: [
-                        { src: normalizePath(path.join(NODE_MODULES, '@jellyfin/ux-web/favicons/touchicon*.png')), dest: 'favicons', rename: { stripBase: true } },
-                        ...LIBRARIES.map(file => ({ src: normalizePath(path.join(NODE_MODULES, file)), dest: 'libraries', rename: { stripBase: true } }))
+                        { src: normalizePath(path.join(NODE_MODULES, '@jellyfin/ux-web/favicons/touchicon*.png')), dest: 'favicons', rename: { stripBase: true } }
                     ]
                 })
             ])

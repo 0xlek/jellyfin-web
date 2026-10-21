@@ -7,7 +7,8 @@ import toast from 'components/toast/toast';
 import { AppFeature } from 'constants/appFeature';
 import LinkButton from 'elements/emby-button/LinkButton';
 import globalize from 'lib/globalize';
-import { ConnectionState, ServerConnections } from 'lib/jellyfin-apiclient';
+import ServerConnections from 'lib/jellyfin-apiclient/ServerConnections';
+import { ConnectionState } from 'lib/jellyfin-apiclient';
 
 interface ConnectionErrorPageProps {
     state: ConnectionState
