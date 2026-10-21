@@ -34,7 +34,8 @@ const DETAIL_FIELDS = [
     ItemFields.People,
     ItemFields.Studios,
     ItemFields.RecursiveItemCount,
-    ItemFields.MediaSources
+    ItemFields.MediaSources,
+    ItemFields.Trickplay
 ];
 
 /** Everything this app shows: video only, no music, books or photos. */

@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import classNames from 'classnames';
 import type Hls from 'hls.js';
 import Screenfull from 'screenfull';
-import React, { type FC, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react';
+import React, { type FC, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useApi } from 'hooks/useApi';
 import globalize from 'lib/globalize';
@@ -15,12 +15,14 @@ import Icon from '../icons';
 import { formatClock, secondsToTicks, ticksToSeconds } from '../utils';
 import { getPlaybackSource, type PlaybackSource, type SubtitleTrack } from './source';
 import { loadTrackPrefs, matchTrack, saveTrackPrefs, toPick, type TrackPrefs } from './tracks';
+import { getTrickplay, previewCell } from './trickplay';
 
 const PROGRESS_INTERVAL_MS = 10_000;
 const IDLE_HIDE_MS = 2500;
 const DOUBLE_TAP_MS = 300;
 const FLASH_MS = 600;
 const SPEEDS = [ 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2 ];
+const PREVIEW_WIDTH = 192;
 
 const initialSubtitle = (tracks: SubtitleTrack[], prefs: TrackPrefs) => {
     if (prefs.subtitle === null) return -1;
@@ -373,6 +375,33 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onTo
 
     const showControls = !playing || !idle || scrubbing || menuOpen;
 
+    const trickplay = useMemo(() => getTrickplay(api, item, source?.mediaSourceId), [ api, item, source?.mediaSourceId ]);
+    // A few tiles cover a whole episode; fetching them all on first hover keeps scrubbing off the network
+    const preloaded = useRef(false);
+    const preloadPreviews = () => {
+        if (!trickplay || preloaded.current) return;
+        preloaded.current = true;
+        for (let tile = 0; tile < trickplay.tileCount; tile++) new Image().src = trickplay.tileUrl(tile);
+    };
+    const renderPreview = (seconds: number) => {
+        if (!trickplay) return null;
+        const cell = previewCell(trickplay, seconds);
+        const scale = PREVIEW_WIDTH / trickplay.width;
+        const height = trickplay.height * scale;
+        return (
+            <span
+                className='tb-scrubber__preview'
+                style={{
+                    width: PREVIEW_WIDTH,
+                    height,
+                    backgroundImage: `url("${trickplay.tileUrl(cell.tile)}")`,
+                    backgroundSize: `${trickplay.columns * PREVIEW_WIDTH}px auto`,
+                    backgroundPosition: `-${cell.x * PREVIEW_WIDTH}px -${cell.y * height}px`
+                }}
+            />
+        );
+    };
+
     // Touch: tap shows the controls (or plays/pauses when they are up), double tap on a side skips 10s like YouTube
     const pointerType = useRef('mouse');
     const lastTap = useRef<{ at: number, side: number }>();
@@ -460,6 +489,7 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onTo
                     onPointerDown={onBarPointerDown}
                     onPointerMove={onBarPointerMove}
                     onPointerUp={onBarPointerUp}
+                    onPointerEnter={preloadPreviews}
                     onPointerLeave={() => setHover(undefined)}
                 >
                     <div className='tb-scrubber__track'>
@@ -469,7 +499,14 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onTo
                     </div>
                     <span className='tb-scrubber__thumb' style={{ left: `${played}%` }} />
                     {hover !== undefined && (
-                        <span className='tb-scrubber__tooltip' style={{ left: `${(hover / duration) * 100}%` }}>{formatClock(hover)}</span>
+                        <span
+                            className='tb-scrubber__tooltip'
+                            // Keep a preview inside the player at both ends of the bar
+                            style={{ left: `clamp(${trickplay ? PREVIEW_WIDTH / 2 : 0}px, ${(hover / duration) * 100}%, calc(100% - ${trickplay ? PREVIEW_WIDTH / 2 : 0}px))` }}
+                        >
+                            {renderPreview(hover)}
+                            <span className='tb-scrubber__time'>{formatClock(hover)}</span>
+                        </span>
                     )}
                 </div>
 

@@ -1175,13 +1175,29 @@
 .tb-scrubber__tooltip {
     position: absolute;
     bottom: 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+.tb-scrubber__preview {
+    display: block;
+    border: 2px solid #fff;
+    border-radius: 8px;
+    background-color: #000;
+    background-repeat: no-repeat;
+    box-sizing: content-box;
+}
+
+.tb-scrubber__time {
     padding: 2px 8px;
     border-radius: 4px;
     background: rgba(28, 28, 28, 0.9);
     font-size: 13px;
     font-weight: 500;
-    transform: translateX(-50%);
-    pointer-events: none;
 }
 
 .tb-controls {
