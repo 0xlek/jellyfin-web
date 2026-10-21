@@ -184,9 +184,9 @@ export const LibraryForm: FC<{ id: string, onDone: () => void }> = ({ id, onDone
                 actions={<button type='button' className='tb-btn tb-btn--small' onClick={() => setPicking(true)}><Icon name='plus' /> {globalize.translate('Add')}</button>}
             >
                 {paths.map(path => (
-                    <div key={path} className='tb-list__item'>
+                    <div key={path} className='tb-row'>
                         <Icon name='folder' />
-                        <span className='tb-list__main' style={{ cursor: 'default' }}><span className='tb-list__title'>{path}</span></span>
+                        <span className='tb-row__main' style={{ cursor: 'default' }}><span className='tb-row__title'>{path}</span></span>
                         <button type='button' className='tb-icon-btn' title={globalize.translate('Delete')} onClick={() => setPaths(p => p.filter(x => x !== path))}><Icon name='trash' /></button>
                     </div>
                 ))}

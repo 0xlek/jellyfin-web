@@ -31,13 +31,13 @@ export const Logs: FC = () => {
                 <Section title={globalize.translate('TabLogs')}>
                     {error ? <ErrorNotice error={error} /> : null}
                     {isPending ? <Loading /> : (
-                        <div className='tb-list'>
+                        <div className='tb-rows'>
                             {logs?.map(log => (
-                                <Link key={log.Name} to={`/dashboard/logs/${encodeURIComponent(log.Name ?? '')}`} className='tb-list__item'>
+                                <Link key={log.Name} to={`/dashboard/logs/${encodeURIComponent(log.Name ?? '')}`} className='tb-row'>
                                     <Icon name='logs' />
-                                    <span className='tb-list__main'>
-                                        <span className='tb-list__title'>{log.Name}</span>
-                                        <span className='tb-list__meta'>{formatAgo(log.DateModified)} · {formatBytes(log.Size)}</span>
+                                    <span className='tb-row__main'>
+                                        <span className='tb-row__title'>{log.Name}</span>
+                                        <span className='tb-row__meta'>{formatAgo(log.DateModified)} · {formatBytes(log.Size)}</span>
                                     </span>
                                 </Link>
                             ))}

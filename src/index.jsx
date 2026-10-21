@@ -10,14 +10,15 @@ import { EventType } from 'constants/eventType';
 import globalize from './lib/globalize';
 import { loadCoreDictionary } from 'lib/globalize/loader';
 import getServerAddress from 'lib/jellyfin-apiclient/utils/getServerAddress';
-import taskButton from './scripts/taskbutton';
-import { serverAddress } from './utils/dashboard';
+import { serverAddress } from './utils/session';
 import Events from './utils/events';
 import { updateApiClientSdk } from 'utils/jellyfin-apiclient/compat';
 
 import RootApp from './RootApp';
 
 import './styles/site.scss';
+import './styles/fonts.scss';
+import './styles/fonts.inter.scss';
 
 async function init() {
     // Log current version to console to help out with issue triage and debugging
@@ -29,7 +30,6 @@ build: ${__JF_BUILD_VERSION__}`);
 
     // Register globals used in plugins
     window.Events = Events;
-    window.TaskButton = taskButton;
 
     // Initialize app host
     await appHost.init();
@@ -59,22 +59,10 @@ build: ${__JF_BUILD_VERSION__}`);
             });
     });
 
-    // Load the font styles
-    loadFonts();
-
     // Render the app
     await renderApp();
 
     registerServiceWorker();
-}
-
-function loadFonts() {
-    if (__USE_SYSTEM_FONTS__) {
-        import('./styles/fonts.scss');
-    } else {
-        import('./styles/fonts.scss');
-        import('./styles/fonts.noto.scss');
-    }
 }
 
 function registerServiceWorker() {

@@ -43,7 +43,7 @@ export const followConnection = (result: ConnectionResult, navigate: NavigateFun
             navigate('/selectserver');
             return undefined;
         case ConnectionState.ServerUpdateNeeded:
-            return globalize.translate('ServerUpdateNeeded', 'https://github.com/jellyfin/jellyfin');
+            return 'This server is too old for this client. Update the server and try again.';
         default:
             return globalize.translate('MessageUnableToConnectToServer');
     }

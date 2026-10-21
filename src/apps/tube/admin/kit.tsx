@@ -14,7 +14,8 @@ import { QUERY_KEY as NAMED_CONFIG_KEY, useNamedConfiguration } from 'hooks/useN
 import globalize from 'lib/globalize';
 
 import { TextSetting } from '../components/Form';
-import { useDocumentTitle } from '../hooks';
+import { SERVER_NAME_KEY } from '../api';
+import { useDocumentTitle, useIdle } from '../hooks';
 import Icon from '../icons';
 
 import '../forms.scss';
@@ -22,10 +23,12 @@ import './admin.scss';
 
 export type Tab = { to: string, label: string, end?: boolean };
 
-type AdminPageProps = { title: string, actions?: ReactNode, tabs?: Tab[], back?: Tab };
+/** warm: fetches the other tabs' data once the browser is idle, so switching tabs shows content at once. */
+type AdminPageProps = { title: string, actions?: ReactNode, tabs?: Tab[], back?: Tab, warm?: FC };
 
-export const AdminPage: FC<PropsWithChildren<AdminPageProps>> = ({ title, actions, tabs, back, children }) => {
+export const AdminPage: FC<PropsWithChildren<AdminPageProps>> = ({ title, actions, tabs, back, warm: Warm, children }) => {
     useDocumentTitle(title);
+    const idle = useIdle();
     return (
         <Page id='tubeAdmin' className='tb-page tb-admin' isNowPlayingBarEnabled={false}>
             {back && (
@@ -43,6 +46,7 @@ export const AdminPage: FC<PropsWithChildren<AdminPageProps>> = ({ title, action
                 </nav>
             )}
             {children}
+            {idle && Warm && <Warm />}
         </Page>
     );
 };
@@ -153,6 +157,8 @@ export const useSaveServerConfig = () => {
         const { data: current } = await getSystemApi(api!).getConfiguration();
         await getSystemApi(api!).updateConfiguration({ serverConfiguration: { ...current, ...changes } });
         await queryClient.invalidateQueries({ queryKey: [ CONFIG_KEY ] });
+        // The server name is shown next to the logo
+        await queryClient.invalidateQueries({ queryKey: SERVER_NAME_KEY });
     };
 };
 
@@ -349,11 +355,11 @@ export const PathPicker: FC<PickerProps> = ({ open, title, initialPath, includeF
                     <button
                         key={entry.Path}
                         type='button'
-                        className='tb-list__item'
+                        className='tb-row'
                         onClick={() => (entry.Type === 'File' ? setTyped(entry.Path ?? '') : go(entry.Path ?? ''))}
                     >
                         <Icon name={entry.Type === 'File' ? 'logs' : 'folder'} />
-                        <span className='tb-list__title'>{entry.Name}</span>
+                        <span className='tb-row__title'>{entry.Name}</span>
                     </button>
                 ))}
                 {entries?.length === 0 && <div className='tb-empty'>{globalize.translate('MessageNoItemsAvailable')}</div>}

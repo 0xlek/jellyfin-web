@@ -79,3 +79,20 @@ export const useDocumentTitle = (title?: string | null) => {
         document.title = title ? `${title} · Jellyfin` : 'Jellyfin';
     }, [ title ]);
 };
+
+/** Runs fn once the browser is idle (or after a short delay where idle callbacks are missing); returns a cancel function. */
+export const whenIdle = (fn: () => void) => {
+    if ('requestIdleCallback' in window) {
+        const id = window.requestIdleCallback(fn, { timeout: 4000 });
+        return () => window.cancelIdleCallback(id);
+    }
+    const id = setTimeout(fn, 1500);
+    return () => clearTimeout(id);
+};
+
+/** False until the browser has been idle once after mount. */
+export const useIdle = () => {
+    const [ idle, setIdle ] = useState(false);
+    useEffect(() => whenIdle(() => setIdle(true)), []);
+    return idle;
+};

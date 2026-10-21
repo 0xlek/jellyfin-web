@@ -4,6 +4,9 @@ import { useSearchParams } from 'react-router-dom';
 import AppBody from 'components/AppBody';
 import ServerContentPage from 'components/ServerContentPage';
 import ThemeCss from 'components/ThemeCss';
+import taskButton from 'scripts/taskbutton';
+// Defines the Dashboard global plugin scripts call
+import 'utils/dashboard';
 
 import { useDocumentTitle } from '../../hooks';
 
@@ -20,6 +23,9 @@ import 'elements/emby-toggle/emby-toggle';
 
 import 'styles/dashboard.scss';
 import '../admin.scss';
+
+// Plugin scripts call this global
+Object.assign(window, { TaskButton: taskButton });
 
 /**
  * A plugin's own settings page. Plugins ship it as HTML and script written against the classic

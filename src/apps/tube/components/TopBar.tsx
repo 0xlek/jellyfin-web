@@ -5,9 +5,9 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useApi } from 'hooks/useApi';
 import globalize from 'lib/globalize';
-import Dashboard from 'utils/dashboard';
+import { logout } from 'utils/session';
 
-import { useCurrentUser, useSearchSuggestions } from '../api';
+import { useCurrentUser, useSearchSuggestions, useServerName } from '../api';
 import { useDebounced, useDismiss, isTyping } from '../hooks';
 import Icon from '../icons';
 import { itemLink } from '../utils';
@@ -134,7 +134,7 @@ const UserMenu: FC = () => {
                 <div className='tb-menu' role='menu'>
                     <div className='tb-menu__header'>{user?.Name}</div>
                     <Link role='menuitem' className='tb-menu__item' to='/settings' onClick={close}>
-                        <Icon name='settings' />{globalize.translate('Settings')}
+                        <Icon name='gear' />{globalize.translate('Settings')}
                     </Link>
                     {user?.Policy?.IsAdministrator && (
                         <Link role='menuitem' className='tb-menu__item' to='/dashboard' onClick={close}>
@@ -144,7 +144,7 @@ const UserMenu: FC = () => {
                     <hr />
                     <button role='menuitem' className='tb-menu__item' onClick={() => {
                         close();
-                        Dashboard.logout();
+                        logout();
                     }}>
                         <Icon name='logout' />{globalize.translate('ButtonSignOut')}
                     </button>
@@ -156,22 +156,25 @@ const UserMenu: FC = () => {
 
 type TopBarProps = { onMenuClick: () => void };
 
-const TopBar: FC<TopBarProps> = ({ onMenuClick }) => (
-    <header className='tb-topbar'>
-        <div className='tb-topbar__start'>
-            <button className='tb-icon-btn' aria-label='Menu' onClick={onMenuClick}>
-                <Icon name='menu' />
-            </button>
-            <Link to='/home' className='tb-logo' aria-label={globalize.translate('Home')}>
-                <span className='tb-logo__mark'><Icon name='play' filled /></span>
-                <span className='tb-logo__text'>Jellyfin</span>
-            </Link>
-        </div>
-        <SearchBox />
-        <div className='tb-topbar__end'>
-            <UserMenu />
-        </div>
-    </header>
-);
+const TopBar: FC<TopBarProps> = ({ onMenuClick }) => {
+    const serverName = useServerName();
+    return (
+        <header className='tb-topbar'>
+            <div className='tb-topbar__start'>
+                <button className='tb-icon-btn' aria-label='Menu' onClick={onMenuClick}>
+                    <Icon name='menu' />
+                </button>
+                <Link to='/home' className='tb-logo' aria-label={globalize.translate('Home')}>
+                    <span className='tb-logo__mark'><Icon name='play' filled /></span>
+                    <span className='tb-logo__text'>{serverName}</span>
+                </Link>
+            </div>
+            <SearchBox />
+            <div className='tb-topbar__end'>
+                <UserMenu />
+            </div>
+        </header>
+    );
+};
 
 export default TopBar;

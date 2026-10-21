@@ -5,46 +5,55 @@ import { Outlet, ScrollRestoration, useLocation } from 'react-router-dom';
 import TopBar from './components/TopBar';
 import Sidebar from './components/Sidebar';
 import AdminNav from './admin/AdminNav';
-import { useStoredState } from './hooks';
+import { useApi } from 'hooks/useApi';
+
+import { ADMIN_PAGE_LOADERS } from './admin/routes';
+import { useStoredState, whenIdle } from './hooks';
+import { USER_PAGE_LOADERS } from './routes';
 
 import './tube.scss';
 import './forms.scss';
 
-/** Above this width the guide sits inline and the menu button toggles full/mini; below it, it is an overlay drawer. */
+/** Wide windows start with the full guide, narrower ones with the icon rail. */
 const WIDE_QUERY = '(min-width: 1313px)';
+/** On phones the guide is an overlay drawer instead, as pushing the content would leave no room for it. */
+const DRAWER_QUERY = '(max-width: 791px)';
 
 export const Component = () => {
     const location = useLocation();
-    const [ expanded, setExpanded ] = useStoredState('tube-guide', 'true');
+    const [ expanded, setExpanded ] = useStoredState('tube-guide', window.matchMedia(WIDE_QUERY).matches ? 'true' : 'false');
     const [ drawerOpen, setDrawerOpen ] = useState(false);
-    // The watch page gives the player the full width, like YouTube; its guide is always the drawer
-    const isWatch = location.pathname === '/watch';
     const isAdmin = location.pathname === '/dashboard' || location.pathname.startsWith('/dashboard/') || location.pathname === '/configurationpage';
     const Guide = isAdmin ? AdminNav : Sidebar;
 
+    const { user } = useApi();
+    const canAdmin = !!user?.Policy?.IsAdministrator;
+
     useEffect(() => setDrawerOpen(false), [ location.pathname, location.search ]);
 
-    const onMenuClick = useCallback(() => {
-        if (!isWatch && window.matchMedia(WIDE_QUERY).matches) {
-            setExpanded(v => (v === 'true' ? 'false' : 'true'));
-        } else {
-            setDrawerOpen(o => !o);
+    // Load the other pages' code while the browser has nothing else to do, so navigating never waits for it
+    useEffect(() => whenIdle(() => {
+        for (const loader of [ ...USER_PAGE_LOADERS, ...(canAdmin ? ADMIN_PAGE_LOADERS : []) ]) {
+            loader().catch(() => undefined);
         }
-    }, [ isWatch, setExpanded ]);
+    }), [ canAdmin ]);
+
+    const onMenuClick = useCallback(() => {
+        if (window.matchMedia(DRAWER_QUERY).matches) {
+            setDrawerOpen(o => !o);
+        } else {
+            setExpanded(v => (v === 'true' ? 'false' : 'true'));
+        }
+    }, [ setExpanded ]);
 
     const closeDrawer = useCallback(() => setDrawerOpen(false), []);
 
     return (
-        <div className={classNames('tb-app', {
-            'is-guide-mini': expanded !== 'true',
-            'is-watch': isWatch
-        })}>
+        <div className={classNames('tb-app', { 'is-guide-collapsed': expanded !== 'true' })}>
             <TopBar onMenuClick={onMenuClick} />
-            {!isWatch && (
-                <div className='tb-app__guide'>
-                    <Guide />
-                </div>
-            )}
+            <div className='tb-app__guide'>
+                <Guide collapsed={expanded !== 'true'} />
+            </div>
             {drawerOpen && (
                 <div className='tb-drawer'>
                     <button className='tb-drawer__scrim' aria-label='Close menu' onClick={closeDrawer} />

@@ -1,7 +1,7 @@
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
 import { BaseItemKind } from '@jellyfin/sdk/lib/generated-client/models/base-item-kind';
 import classNames from 'classnames';
-import React, { type FC, useCallback, useState } from 'react';
+import React, { type FC, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 
 import Page from 'components/Page';
@@ -140,6 +140,14 @@ const Watch: FC = () => {
 
     const toggleTheater = useCallback(() => setTheater(v => (v === 'true' ? 'false' : 'true')), [ setTheater ]);
 
+    const listRef = useRef<HTMLDivElement>(null);
+    // Bring the playing item to the top of the list (scrolling the list only, not the page)
+    useEffect(() => {
+        const list = listRef.current;
+        const current = list?.querySelector<HTMLElement>('.is-current');
+        if (list && current) list.scrollTo({ top: current.offsetTop - list.offsetTop - 8 });
+    }, [ id, playlist ]);
+
     if (!id) return <Navigate replace to='/home' />;
 
     const isTheater = theater === 'true';
@@ -147,6 +155,7 @@ const Watch: FC = () => {
     const trackGroup = item?.SeriesId ?? listId ?? (findingCollection && item?.Type === BaseItemKind.Video ? undefined : item?.Id);
 
     // One grid: theater mode only changes the grid areas, so the player never remounts mid-stream
+
     return (
         <Page id='tubeWatch' className={classNames('tb-page tb-watch', { 'is-theater': isTheater })} isNowPlayingBarEnabled={false}>
             <div className='tb-watch__layout'>
@@ -196,7 +205,7 @@ const Watch: FC = () => {
                             />
                         </label>
                     </div>
-                    <div className='tb-list'>
+                    <div className='tb-list tb-upnext' ref={listRef}>
                         {playlist ?
                             playlist.map((video, i) => (
                                 <VideoCard key={video.Id} item={video} to={linkTo(video)} index={i + 1} current={video.Id === id} compact />

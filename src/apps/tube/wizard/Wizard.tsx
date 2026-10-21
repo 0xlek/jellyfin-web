@@ -142,13 +142,13 @@ const Library: FC<StepProps> = ({ onNext, onBack }) => {
 
     return (
         <StepForm title={globalize.translate('HeaderSetupLibrary')} onSubmit={onNext} onBack={onBack}>
-            <div className='tb-list'>
+            <div className='tb-rows'>
                 {folders?.map(f => (
-                    <button key={f.ItemId} type='button' className='tb-list__item' style={{ cursor: 'pointer' }} onClick={() => setEditing(f.ItemId!)}>
+                    <button key={f.ItemId} type='button' className='tb-row' style={{ cursor: 'pointer' }} onClick={() => setEditing(f.ItemId!)}>
                         <Icon name='folder' />
-                        <span className='tb-list__main'>
-                            <span className='tb-list__title'>{f.Name}</span>
-                            <span className='tb-list__meta'>
+                        <span className='tb-row__main'>
+                            <span className='tb-row__title'>{f.Name}</span>
+                            <span className='tb-row__meta'>
                                 {[ LIBRARY_TYPES.find(t => t.value === (f.CollectionType ?? 'mixed'))?.label(), ...(f.Locations ?? []) ].filter(Boolean).join(' · ')}
                             </span>
                         </span>

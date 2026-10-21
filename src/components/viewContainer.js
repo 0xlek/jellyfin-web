@@ -1,6 +1,5 @@
 import { importModule } from '@uupaa/dynamic-import-polyfill';
 import './viewManager/viewContainer.scss';
-import Dashboard from '../utils/dashboard';
 
 const getMainAnimatedPages = () => {
     return document.querySelector('.mainAnimatedPages');
@@ -18,7 +17,7 @@ function setControllerClass(view, options) {
             controllerUrl = controllerUrl.substring('__plugin/'.length);
         }
 
-        controllerUrl = Dashboard.getPluginUrl(controllerUrl);
+        controllerUrl = 'configurationpage?name=' + encodeURIComponent(controllerUrl);
         const apiUrl = ApiClient.getUrl('/web/' + controllerUrl);
         return importModule(apiUrl).then((ControllerFactory) => {
             options.controllerFactory = ControllerFactory;

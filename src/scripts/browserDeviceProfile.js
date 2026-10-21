@@ -91,7 +91,7 @@ function canPlayNativeHlsInFmp4() {
 
 function canPlayHlsWithMSE() {
     // text tracks don’t work with this in firefox
-    return window.MediaSource != null; /* eslint-disable-line compat/compat */
+    return window.MediaSource != null;
 }
 
 function supportsAc3(videoTestElement) {
@@ -216,7 +216,6 @@ function testCanPlayMkv(videoTestElement) {
     if (browser.firefox) {
         // As of Firefox 145, its mkv support is buggy and causes playback issues because it would force preloading the
         // whole mkv file before playback starts, which is extremely undesirable for streaming.
-        // See https://github.com/jellyfin/jellyfin/issues/15521
         return false;
     }
 
@@ -435,7 +434,7 @@ function getSpeakerCount() {
 
     maxChannelCount = -1;
 
-    const AudioContext = window.AudioContext || window.webkitAudioContext || false; /* eslint-disable-line compat/compat */
+    const AudioContext = window.AudioContext || window.webkitAudioContext || false;
 
     if (AudioContext) {
         const audioCtx = new AudioContext();

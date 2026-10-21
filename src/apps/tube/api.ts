@@ -9,12 +9,14 @@ import type { LibraryApiGetItemsRequest } from '@jellyfin/sdk/lib/generated-clie
 import { getGenreApi } from '@jellyfin/sdk/lib/utils/api/genre-api';
 import { getLibraryApi } from '@jellyfin/sdk/lib/utils/api/library-api';
 import { getShowApi } from '@jellyfin/sdk/lib/utils/api/show-api';
+import { getSystemApi } from '@jellyfin/sdk/lib/utils/api/system-api';
 import { getUserApi } from '@jellyfin/sdk/lib/utils/api/user-api';
 import { getUserDataApi } from '@jellyfin/sdk/lib/utils/api/user-data-api';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useApi } from 'hooks/useApi';
 
+import { getServerApi } from './auth/connection';
 import { buildCatalog } from './catalog';
 
 /** Every query of this app lives under this key, so playback can refresh them all at once. */
@@ -351,4 +353,18 @@ export const useCurrentUser = () => {
         initialData: user,
         enabled: !!api && !!user?.Id
     });
+};
+
+export const SERVER_NAME_KEY = [ 'Tube', 'ServerName' ];
+
+/** The name of the server this client is connected to, shown as the app's name; works before sign-in too. */
+export const useServerName = () => {
+    const { api } = useApi();
+    const server = api ?? getServerApi();
+    const { data } = useQuery({
+        queryKey: [ ...SERVER_NAME_KEY, server?.basePath ],
+        queryFn: async ({ signal }) => (await getSystemApi(server!).getPublicSystemInfo({ signal })).data.ServerName ?? '',
+        enabled: !!server
+    });
+    return data;
 };

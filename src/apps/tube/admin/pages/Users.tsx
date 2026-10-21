@@ -45,18 +45,18 @@ const Users: FC = () => {
         >
             {confirmDialog}
             {isPending ? <Loading /> : (
-                <div className='tb-list'>
+                <div className='tb-rows'>
                     {users?.map(user => (
-                        <div key={user.Id} className='tb-list__item'>
+                        <div key={user.Id} className='tb-row'>
                             <UserAvatar user={user} small />
-                            <Link to={`/dashboard/users/${user.Id}/profile`} className='tb-list__main'>
-                                <span className='tb-list__title'>
+                            <Link to={`/dashboard/users/${user.Id}/profile`} className='tb-row__main'>
+                                <span className='tb-row__title'>
                                     {user.Name}{' '}
                                     {user.Policy?.IsAdministrator && <span className='tb-badge tb-badge--accent'>Admin</span>}{' '}
                                     {user.Policy?.IsDisabled && <span className='tb-badge tb-badge--error'>{globalize.translate('Disabled')}</span>}{' '}
                                     {user.Policy?.IsHidden && <span className='tb-badge'>Hidden</span>}
                                 </span>
-                                <span className='tb-list__meta'>
+                                <span className='tb-row__meta'>
                                     {user.LastActivityDate ? globalize.translate('LastSeen', formatAgo(user.LastActivityDate)) : globalize.translate('Never')}
                                 </span>
                             </Link>

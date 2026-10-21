@@ -77,7 +77,8 @@ export default defineConfig(({ command, mode }) => {
 
     return {
         root: SRC,
-        base: './',
+        // The app is always served from /web/; absolute asset URLs let the browser preload them before any script runs
+        base: isServe || isTest ? './' : '/web/',
         publicDir: false,
         resolve: {
             // Stylesheets still use webpack's "~package" prefix for files in node_modules
@@ -88,7 +89,6 @@ export default defineConfig(({ command, mode }) => {
             __JF_BUILD_VERSION__: JSON.stringify(isServe ? 'Dev Server' : process.env.JELLYFIN_VERSION || 'Release'),
             __PACKAGE_JSON_NAME__: JSON.stringify(packageJson.name),
             __PACKAGE_JSON_VERSION__: JSON.stringify(packageJson.version),
-            __USE_SYSTEM_FONTS__: JSON.stringify(!!JSON.parse(process.env.USE_SYSTEM_FONTS || '0')),
             __WEBPACK_SERVE__: JSON.stringify(isServe)
         },
         plugins: [
@@ -129,6 +129,14 @@ export default defineConfig(({ command, mode }) => {
                     ...STYLESHEET_ENTRIES
                 },
                 output: {
+                    // Libraries change far less often than the app, so they get their own long-cached chunks
+                    manualChunks: (id: string) => {
+                        if (!id.includes('/node_modules/')) return undefined;
+                        if (/\/node_modules\/(\.pnpm\/[^/]+\/node_modules\/)?(react|react-dom|scheduler|react-router|react-router-dom|@remix-run)\//.test(id)) return 'vendor-react';
+                        if (id.includes('/@tanstack/') && !id.includes('devtools')) return 'vendor-query';
+                        if (/\/(@jellyfin\/sdk|axios)\//.test(id)) return 'vendor-sdk';
+                        return undefined;
+                    },
                     assetFileNames: asset => {
                         const name = asset.names?.[0] ?? '';
                         return name in STYLESHEETS ? name : 'assets/[name]-[hash][extname]';

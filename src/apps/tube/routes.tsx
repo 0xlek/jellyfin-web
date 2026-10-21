@@ -4,12 +4,12 @@ import { Navigate, type RouteObject } from 'react-router-dom';
 import ConnectionRequired from 'components/ConnectionRequired';
 import ErrorBoundary from 'components/router/ErrorBoundary';
 
-import { ADMIN_ROUTES } from './admin/routes';
+import { ADMIN_ROUTES, pluginPageRoute } from './admin/routes';
 
 /** Old settings pages, now sections of /settings. */
 const SETTINGS_REDIRECTS: Record<string, string> = {
     mypreferencesmenu: '',
-    mypreferencesdisplay: '#display',
+    mypreferencesdisplay: '',
     mypreferenceshome: '',
     mypreferencesplayback: '#playback',
     mypreferencessubtitles: '#playback',
@@ -29,6 +29,22 @@ export const TUBE_PATHS = [
 
 const page = (load: () => Promise<{ default: ComponentType }>) => async () => ({ Component: (await load()).default });
 
+/** Page modules, shared by the routes and the idle preloader so each loads once. */
+const load = {
+    home: () => import('./pages/Home'),
+    watch: () => import('./pages/Watch'),
+    results: () => import('./pages/Results'),
+    library: () => import('./pages/Library'),
+    series: () => import('./pages/Series'),
+    feed: () => import('./pages/Feed'),
+    collection: () => import('./pages/Collection'),
+    details: () => import('./pages/Details'),
+    settings: () => import('./settings/Settings')
+};
+
+/** Every page module of a signed-in user, for loading ahead while the browser is idle. */
+export const USER_PAGE_LOADERS = Object.values(load);
+
 export const TUBE_ROUTES: RouteObject[] = [
     {
         lazy: () => import('./AppLayout'),
@@ -37,15 +53,15 @@ export const TUBE_ROUTES: RouteObject[] = [
                 Component: ConnectionRequired,
                 ErrorBoundary,
                 children: [
-                    { path: 'home', lazy: page(() => import('./pages/Home')) },
-                    { path: 'watch', lazy: page(() => import('./pages/Watch')) },
-                    { path: 'results', lazy: page(() => import('./pages/Results')) },
-                    { path: 'library/:id', lazy: page(() => import('./pages/Library')) },
-                    { path: 'series/:id', lazy: page(() => import('./pages/Series')) },
-                    { path: 'feed/:kind', lazy: page(() => import('./pages/Feed')) },
-                    { path: 'collection/:id', lazy: page(() => import('./pages/Collection')) },
-                    { path: 'details', lazy: page(() => import('./pages/Details')) },
-                    { path: 'settings', lazy: page(() => import('./settings/Settings')) },
+                    { path: 'home', lazy: page(load.home) },
+                    { path: 'watch', lazy: page(load.watch) },
+                    { path: 'results', lazy: page(load.results) },
+                    { path: 'library/:id', lazy: page(load.library) },
+                    { path: 'series/:id', lazy: page(load.series) },
+                    { path: 'feed/:kind', lazy: page(load.feed) },
+                    { path: 'collection/:id', lazy: page(load.collection) },
+                    { path: 'details', lazy: page(load.details) },
+                    { path: 'settings', lazy: page(load.settings) },
                     ...Object.entries(SETTINGS_REDIRECTS).map(([ path, section ]) => ({
                         path,
                         element: <Navigate replace to={`/settings${section}`} />
@@ -57,7 +73,7 @@ export const TUBE_ROUTES: RouteObject[] = [
                 ErrorBoundary,
                 children: [
                     { path: 'dashboard', children: ADMIN_ROUTES },
-                    { path: 'configurationpage', lazy: page(() => import('./admin/pages/PluginPage')) }
+                    { path: 'configurationpage', lazy: pluginPageRoute }
                 ]
             }
         ]

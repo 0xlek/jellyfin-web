@@ -25,6 +25,13 @@ const TRUSTED_REPO_URL = 'https://repo.jellyfin.org/';
 /** Categories that matter for a video server; the rest go under "other". */
 const CATEGORIES = [ PluginCategory.MoviesAndShows, PluginCategory.Anime, PluginCategory.Subtitles, PluginCategory.General, PluginCategory.Administration ];
 
+/** Loads the data of both plugin tabs into the cache. */
+const PluginsWarm: FC = () => {
+    usePluginDetails();
+    useRepositories();
+    return null;
+};
+
 const pluginTabs = (): Tab[] => [
     { to: '/dashboard/plugins', label: globalize.translate('TabPlugins') },
     { to: '/dashboard/plugins/repositories', label: globalize.translate('TabRepositories') }
@@ -74,7 +81,7 @@ export const Plugins: FC = () => {
     }), [ plugins, status, category, query ]);
 
     return (
-        <AdminPage title={globalize.translate('TabPlugins')} tabs={pluginTabs()}>
+        <AdminPage title={globalize.translate('TabPlugins')} tabs={pluginTabs()} warm={PluginsWarm}>
             <div className='tb-input-row' style={{ maxWidth: 420, marginBottom: 8 }}>
                 <input className='tb-input' type='search' placeholder={globalize.translate('Search')} value={query} onChange={e => setQuery(e.target.value)} />
             </div>
@@ -93,12 +100,12 @@ export const Plugins: FC = () => {
             </div>
             {isError && <ErrorNotice>{globalize.translate('PluginsLoadError')}</ErrorNotice>}
             {isPending ? <Loading /> : (
-                <div className='tb-cards' style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+                <div className='tb-panels' style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
                     {shown.map(p => (
-                        <Link key={p.id} to={`/dashboard/plugins/${p.id}`} className='tb-card' style={{ padding: 0, overflow: 'hidden' }}>
+                        <Link key={p.id} to={`/dashboard/plugins/${p.id}`} className='tb-panel' style={{ padding: 0, overflow: 'hidden' }}>
                             <PluginThumb plugin={p} />
                             <div style={{ padding: '4px 16px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                <div className='tb-card__title'>{p.name}</div>
+                                <div className='tb-panel__title'>{p.name}</div>
                                 <div>{statusBadge(p)}</div>
                             </div>
                         </Link>
@@ -151,7 +158,7 @@ export const Plugin: FC = () => {
             back={{ to: '/dashboard/plugins', label: globalize.translate('TabPlugins') }}
             actions={<>
                 {plugin.configurationPage?.Name && plugin.status && (
-                    <Link to={configurationPageUrl(plugin.configurationPage.Name)} className='tb-btn'><Icon name='settings' /> {globalize.translate('Settings')}</Link>
+                    <Link to={configurationPageUrl(plugin.configurationPage.Name)} className='tb-btn'><Icon name='gear' /> {globalize.translate('Settings')}</Link>
                 )}
                 {plugin.status && (
                     <button type='button' className='tb-btn' disabled={busy} onClick={onToggle}>
@@ -170,8 +177,8 @@ export const Plugin: FC = () => {
             {failed && <ErrorNotice error={failed} />}
             {(install.isSuccess || plugin.status === PluginStatus.Restart) && <div className='tb-notice' role='status'>{globalize.translate('ServerRestartNeededAfterPluginInstall')}</div>}
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 320px) minmax(0, 1fr)', gap: 24, alignItems: 'start', marginTop: 8 }} className='tb-plugin'>
-                <div className='tb-card' style={{ padding: 0, overflow: 'hidden' }}><PluginThumb plugin={plugin} /></div>
-                <div className='tb-list'>
+                <div className='tb-panel' style={{ padding: 0, overflow: 'hidden' }}><PluginThumb plugin={plugin} /></div>
+                <div className='tb-rows'>
                     <p>{plugin.description}</p>
                     <p className='tb-muted'>
                         {[
@@ -185,13 +192,13 @@ export const Plugin: FC = () => {
             {!!plugin.versions.length && (
                 <div style={{ marginTop: 32 }}>
                     <Section title={globalize.translate('HeaderRevisionHistory')}>
-                        <div className='tb-list'>
+                        <div className='tb-rows'>
                             {plugin.versions.map(v => (
-                                <div key={`${v.version}-${v.repositoryUrl}`} className='tb-list__item' style={{ alignItems: 'flex-start' }}>
-                                    <div className='tb-list__main' style={{ cursor: 'default', gap: 4 }}>
-                                        <span className='tb-list__title'>{v.version} <span className='tb-muted' style={{ fontWeight: 400 }}>{formatDate(v.timestamp)}</span></span>
-                                        {v.changelog && <span className='tb-list__meta' style={{ whiteSpace: 'pre-line' }}>{v.changelog}</span>}
-                                        <span className='tb-list__meta'>{v.repositoryName} · {v.targetAbi}</span>
+                                <div key={`${v.version}-${v.repositoryUrl}`} className='tb-row' style={{ alignItems: 'flex-start' }}>
+                                    <div className='tb-row__main' style={{ cursor: 'default', gap: 4 }}>
+                                        <span className='tb-row__title'>{v.version} <span className='tb-muted' style={{ fontWeight: 400 }}>{formatDate(v.timestamp)}</span></span>
+                                        {v.changelog && <span className='tb-row__meta' style={{ whiteSpace: 'pre-line' }}>{v.changelog}</span>}
+                                        <span className='tb-row__meta'>{v.repositoryName} · {v.targetAbi}</span>
                                     </div>
                                     {v.version !== plugin.version?.version || !plugin.status ? (
                                         <button type='button' className='tb-btn tb-btn--small' disabled={busy} onClick={() => { void onInstall(v); }}>{globalize.translate('HeaderInstall')}</button>
@@ -232,7 +239,7 @@ export const Repositories: FC = () => {
     return (
         <AdminPage
             title={globalize.translate('TabPlugins')}
-            tabs={pluginTabs()}
+            tabs={pluginTabs()} warm={PluginsWarm}
             actions={<button type='button' className='tb-btn tb-btn--primary' onClick={() => setAdding(true)}><Icon name='plus' /> {globalize.translate('HeaderNewRepository')}</button>}
         >
             {confirmDialog}
@@ -260,9 +267,9 @@ export const Repositories: FC = () => {
             {isError && <ErrorNotice>{globalize.translate('RepositoriesPageLoadError')}</ErrorNotice>}
             {setRepositories.isError && <ErrorNotice error={setRepositories.error} />}
             {isPending ? <Loading /> : (
-                <div className='tb-list'>
+                <div className='tb-rows'>
                     {repositories?.map(repo => (
-                        <div key={repo.Url} className='tb-list__item'>
+                        <div key={repo.Url} className='tb-row'>
                             <input
                                 type='checkbox'
                                 className='tb-switch'
@@ -270,9 +277,9 @@ export const Repositories: FC = () => {
                                 aria-label={repo.Name ?? ''}
                                 onChange={e => save((repositories ?? []).map(r => (r.Url === repo.Url ? { ...r, Enabled: e.target.checked } : r)))}
                             />
-                            <span className='tb-list__main' style={{ cursor: 'default' }}>
-                                <span className='tb-list__title'>{repo.Name}</span>
-                                <a className='tb-list__meta' href={repo.Url ?? ''} target='_blank' rel='noopener noreferrer'>{repo.Url}</a>
+                            <span className='tb-row__main' style={{ cursor: 'default' }}>
+                                <span className='tb-row__title'>{repo.Name}</span>
+                                <a className='tb-row__meta' href={repo.Url ?? ''} target='_blank' rel='noopener noreferrer'>{repo.Url}</a>
                             </span>
                             <button type='button' className='tb-icon-btn' title={globalize.translate('Delete')} onClick={() => { void onDelete(repo); }}><Icon name='trash' /></button>
                         </div>

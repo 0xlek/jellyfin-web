@@ -44,11 +44,11 @@ const SessionCard: FC<{ session: SessionInfoDto }> = ({ session }) => {
     const send = (c: PlaystateCommand) => command.mutate({ sessionId: session.Id!, command: c });
 
     return (
-        <div className='tb-card'>
-            <div className='tb-card__head'>
+        <div className='tb-panel'>
+            <div className='tb-panel__head'>
                 <div style={{ minWidth: 0 }}>
-                    <div className='tb-card__title'>{session.DeviceName}</div>
-                    <div className='tb-card__meta'>{[ session.UserName, session.Client, session.ApplicationVersion ].filter(Boolean).join(' · ')}</div>
+                    <div className='tb-panel__title'>{session.DeviceName}</div>
+                    <div className='tb-panel__meta'>{[ session.UserName, session.Client, session.ApplicationVersion ].filter(Boolean).join(' · ')}</div>
                 </div>
                 {item && session.SupportsRemoteControl && (
                     <div style={{ display: 'flex' }}>
@@ -64,27 +64,27 @@ const SessionCard: FC<{ session: SessionInfoDto }> = ({ session }) => {
             {item ? (
                 <>
                     <div>
-                        {playing.topText && <div className='tb-card__meta'>{playing.topText}</div>}
+                        {playing.topText && <div className='tb-panel__meta'>{playing.topText}</div>}
                         <div>{playing.bottomText}</div>
                     </div>
                     <div className='tb-progress'><span style={{ width: `${sessionProgress(session)}%` }} /></div>
-                    <div className='tb-card__meta'>
+                    <div className='tb-panel__meta'>
                         {time.start} / {time.end}
                         {session.TranscodingInfo && !session.TranscodingInfo.IsVideoDirect ? ` · ${globalize.translate('Transcoding')}` : ` · ${globalize.translate('DirectPlaying')}`}
                     </div>
                 </>
             ) : (
-                <div className='tb-card__meta'>{playing.bottomText}</div>
+                <div className='tb-panel__meta'>{playing.bottomText}</div>
             )}
         </div>
     );
 };
 
 const EntryRow: FC<{ entry: ActivityLogEntry }> = ({ entry }) => (
-    <div className='tb-list__item'>
-        <div className='tb-list__main' style={{ cursor: 'default' }}>
+    <div className='tb-row'>
+        <div className='tb-row__main' style={{ cursor: 'default' }}>
             <span>{entry.Name}</span>
-            <span className='tb-list__meta'>{[ formatAgo(entry.Date), entry.ShortOverview ].filter(Boolean).join(' · ')}</span>
+            <span className='tb-row__meta'>{[ formatAgo(entry.Date), entry.ShortOverview ].filter(Boolean).join(' · ')}</span>
         </div>
     </div>
 );
@@ -102,14 +102,14 @@ const STORAGE: { key: 'CacheFolder' | 'ImageCacheFolder' | 'ProgramDataFolder' |
 const StorageRow: FC<{ label: string, folder?: FolderStorageDto }> = ({ label, folder }) => {
     const total = calculateTotal(folder);
     return (
-        <div className='tb-list__item' style={{ alignItems: 'stretch' }}>
-            <div className='tb-list__main' style={{ cursor: 'default', gap: 6 }}>
-                <span className='tb-list__title'>{globalize.translate(label)}</span>
-                <span className='tb-list__meta'>{folder?.Path}</span>
+        <div className='tb-row' style={{ alignItems: 'stretch' }}>
+            <div className='tb-row__main' style={{ cursor: 'default', gap: 6 }}>
+                <span className='tb-row__title'>{globalize.translate(label)}</span>
+                <span className='tb-row__meta'>{folder?.Path}</span>
                 {total > 0 && (
                     <>
                         <div className='tb-progress'><span style={{ width: `${calculateUsedPercentage(folder)}%` }} /></div>
-                        <span className='tb-list__meta'>{formatBytes(folder?.UsedSpace)} / {formatBytes(total)} · {folder?.StorageType}</span>
+                        <span className='tb-row__meta'>{formatBytes(folder?.UsedSpace)} / {formatBytes(total)} · {folder?.StorageType}</span>
                     </>
                 )}
             </div>
@@ -190,15 +190,15 @@ const Overview: FC = () => {
 
                 <Section title={globalize.translate('HeaderActiveDevices')} actions={<Link className='tb-text-btn' to='/dashboard/devices'>{globalize.translate('HeaderDevices')}</Link>}>
                     {sessions?.length ?
-                        <div className='tb-cards'>{sessions.map(s => <SessionCard key={s.Id} session={s} />)}</div> :
+                        <div className='tb-panels'>{sessions.map(s => <SessionCard key={s.Id} session={s} />)}</div> :
                         <p className='tb-muted'>{globalize.translate('MessageNoItemsAvailable')}</p>}
                 </Section>
 
                 {running.length > 0 && (
                     <Section title={globalize.translate('HeaderRunningTasks')}>
                         {running.map(t => (
-                            <Link key={t.Id} to={`/dashboard/tasks/${t.Id}`} className='tb-list__item' style={{ alignItems: 'stretch' }}>
-                                <div className='tb-list__main' style={{ gap: 6 }}>
+                            <Link key={t.Id} to={`/dashboard/tasks/${t.Id}`} className='tb-row' style={{ alignItems: 'stretch' }}>
+                                <div className='tb-row__main' style={{ gap: 6 }}>
                                     <span>{t.Name} {t.CurrentProgressPercentage != null && <span className='tb-muted'>{Math.round(t.CurrentProgressPercentage)}%</span>}</span>
                                     <div className='tb-progress'><span style={{ width: `${t.CurrentProgressPercentage ?? 0}%` }} /></div>
                                 </div>
@@ -207,21 +207,21 @@ const Overview: FC = () => {
                     </Section>
                 )}
 
-                <div className='tb-cards' style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 32 }}>
+                <div className='tb-panels' style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 32 }}>
                     <Section title={globalize.translate('HeaderActivity')} actions={<Link className='tb-text-btn' to='/dashboard/activity'>{globalize.translate('ButtonMore')}</Link>}>
                         {activity?.Items?.length ?
-                            <div className='tb-list'>{activity.Items.map(e => <EntryRow key={e.Id} entry={e} />)}</div> :
+                            <div className='tb-rows'>{activity.Items.map(e => <EntryRow key={e.Id} entry={e} />)}</div> :
                             <p className='tb-muted'>{globalize.translate('MessageNoItemsAvailable')}</p>}
                     </Section>
                     <Section title={globalize.translate('Alerts')} actions={<Link className='tb-text-btn' to='/dashboard/activity?useractivity=false'>{globalize.translate('ButtonMore')}</Link>}>
                         {alerts?.Items?.length ?
-                            <div className='tb-list'>{alerts.Items.map(e => <EntryRow key={e.Id} entry={e} />)}</div> :
+                            <div className='tb-rows'>{alerts.Items.map(e => <EntryRow key={e.Id} entry={e} />)}</div> :
                             <p className='tb-muted'>{globalize.translate('MessageNoItemsAvailable')}</p>}
                     </Section>
                 </div>
 
                 <Section title={globalize.translate('HeaderPaths')}>
-                    <div className='tb-list'>
+                    <div className='tb-rows'>
                         {STORAGE.map(s => <StorageRow key={s.key} label={s.label} folder={storage?.[s.key]} />)}
                     </div>
                 </Section>

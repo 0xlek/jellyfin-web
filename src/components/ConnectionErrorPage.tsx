@@ -45,11 +45,8 @@ const ConnectionErrorPage: FC<ConnectionErrorPageProps> = ({
                 return;
             case ConnectionState.ServerUpdateNeeded:
                 setTitle(globalize.translate('HeaderUpdateRequired'));
-                setHtmlMessage(globalize.translate(
-                    'ServerUpdateNeeded',
-                    '<a href="https://jellyfin.org/downloads/server/">jellyfin.org/downloads/server</a>'
-                ));
-                setMessage(undefined);
+                setHtmlMessage(undefined);
+                setMessage('This server is too old for this client. Update the server and try again.');
                 return;
             case ConnectionState.Unavailable:
                 setTitle(globalize.translate('HeaderServerUnavailable'));

@@ -53,18 +53,18 @@ const SelectServer: FC = () => {
 
             {!isPending && !servers?.length && <p className='tb-auth__subtitle'>{globalize.translate('MessageNoServersAvailable')}</p>}
 
-            <div className='tb-list'>
+            <div className='tb-rows'>
                 {servers?.map(server => (
-                    <div key={server.Id} className='tb-list__item'>
+                    <div key={server.Id} className='tb-row'>
                         <span className='tb-avatar tb-avatar--small' aria-hidden='true'><Icon name='tv' /></span>
                         <button
                             type='button'
-                            className='tb-list__main'
+                            className='tb-row__main'
                             disabled={!!busy}
                             onClick={() => { void connect(server); }}
                         >
-                            <span className='tb-list__title'>{server.Name || addressOf(server)}</span>
-                            <span className='tb-list__meta'>{busy === server.Id ? `${globalize.translate('Connect')}…` : addressOf(server)}</span>
+                            <span className='tb-row__title'>{server.Name || addressOf(server)}</span>
+                            <span className='tb-row__meta'>{busy === server.Id ? `${globalize.translate('Connect')}…` : addressOf(server)}</span>
                         </button>
                         <button
                             type='button'

@@ -13,12 +13,29 @@ import { QUERY_KEY as FOLDERS_KEY, useVirtualFolders } from 'apps/tube/admin/dat
 import { useStartTask } from 'apps/tube/admin/data/tasks/api/useStartTask';
 import useLiveTasks from 'apps/tube/admin/data/tasks/hooks/useLiveTasks';
 import { useApi } from 'hooks/useApi';
+import { useConfiguration } from 'hooks/useConfiguration';
+import { useNamedConfiguration } from 'hooks/useNamedConfiguration';
+import { useUsers } from 'hooks/useUsers';
+import { useCountries } from 'apps/tube/admin/data/libraries/api/useCountries';
+import { useCultures } from 'apps/tube/admin/data/libraries/api/useCultures';
 import globalize from 'lib/globalize';
 
 import Icon from '../../icons';
 import { uploadImage } from '../../utils';
 import { AdminPage, Dialog, ErrorNotice, Loading, type Tab, useConfirm } from '../kit';
 import { LIBRARY_TYPES } from './LibraryEditor';
+
+/** Loads the data of every libraries tab into the cache. */
+export const LibrariesWarm: FC = () => {
+    useVirtualFolders();
+    useConfiguration();
+    useNamedConfiguration('metadata');
+    useNamedConfiguration('xbmcmetadata');
+    useCultures();
+    useCountries();
+    useUsers();
+    return null;
+};
 
 export const libraryTabs = (): Tab[] => [
     { to: '/dashboard/libraries', label: globalize.translate('HeaderLibraries') },
@@ -99,15 +116,15 @@ const LibraryCard: FC<{ folder: VirtualFolderInfo, onRefresh: () => void, onDele
     });
 
     return (
-        <div className='tb-card' style={{ padding: 0, overflow: 'hidden' }}>
+        <div className='tb-panel' style={{ padding: 0, overflow: 'hidden' }}>
             <Link to={`/dashboard/libraries/${folder.ItemId}`} className='tb-library__thumb'>
                 {image ? <img src={image} alt='' /> : <Icon name='folder' />}
                 {progress != null && progress < 100 && <span className='tb-progress tb-library__progress'><span style={{ width: `${progress}%` }} /></span>}
             </Link>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '4px 8px 12px 16px' }}>
                 <Link to={`/dashboard/libraries/${folder.ItemId}`} style={{ flex: 1, minWidth: 0 }}>
-                    <div className='tb-card__title'>{folder.Name}</div>
-                    <div className='tb-card__meta'>
+                    <div className='tb-panel__title'>{folder.Name}</div>
+                    <div className='tb-panel__meta'>
                         {[ type?.label() ?? folder.CollectionType, ...(folder.Locations ?? []) ].filter(Boolean).join(' · ')}
                     </div>
                     {folder.LibraryOptions?.Enabled === false && <span className='tb-badge tb-badge--warn'>{globalize.translate('Disabled')}</span>}
@@ -163,6 +180,7 @@ const Libraries: FC = () => {
         <AdminPage
             title={globalize.translate('HeaderLibraries')}
             tabs={libraryTabs()}
+            warm={LibrariesWarm}
             actions={<>
                 <button type='button' className='tb-btn' disabled={scanning || !scanTask} onClick={() => scanTask?.Id && startTask.mutate({ taskId: scanTask.Id })}>
                     <Icon name='refresh' /> {scanning ? `${Math.round(scanTask?.CurrentProgressPercentage ?? 0)}%` : globalize.translate('ButtonScanAllLibraries')}
@@ -174,7 +192,7 @@ const Libraries: FC = () => {
             <RefreshDialog itemId={refreshing} onClose={() => setRefreshing(undefined)} />
             {error ? <ErrorNotice error={error} /> : null}
             {isPending ? <Loading /> : (
-                <div className='tb-cards'>
+                <div className='tb-panels'>
                     {folders?.map(f => (
                         <LibraryCard key={f.ItemId} folder={f} onRefresh={() => setRefreshing(f.ItemId!)} onDelete={() => { void onDelete(f); }} />
                     ))}

@@ -1,7 +1,6 @@
 import { type Api, Jellyfin, type JellyfinParameters } from '@jellyfin/sdk';
 import type { ApiClient } from 'jellyfin-apiclient';
 
-import { getLanguages } from 'lib/globalize';
 import { safeDecodeURIComponent } from 'utils/url';
 
 const getParameters = (apiClient: ApiClient): JellyfinParameters => ({
@@ -14,7 +13,8 @@ const getParameters = (apiClient: ApiClient): JellyfinParameters => ({
     deviceInfo: {
         name: safeDecodeURIComponent(apiClient.deviceName()),
         id: safeDecodeURIComponent(apiClient.deviceId()),
-        languages: getLanguages()
+        // The app is English only
+        languages: [ 'en-us', 'en' ]
     }
 });
 

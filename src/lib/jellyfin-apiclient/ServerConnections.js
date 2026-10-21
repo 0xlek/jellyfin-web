@@ -4,7 +4,7 @@ import { appHost } from 'components/apphost';
 import appSettings from 'scripts/settings/appSettings';
 import { setUserInfo } from 'scripts/settings/userSettings';
 import { detectBitrate } from 'utils/bitrateTest';
-import Dashboard from 'utils/dashboard';
+import { capabilities as getCapabilities } from 'utils/session';
 import Events from 'utils/events';
 import { createApiClient } from 'utils/jellyfin-apiclient/createApiClient';
 
@@ -147,7 +147,7 @@ class ServerConnections extends ConnectionManager {
 
 const credentialProvider = new Credentials();
 
-const capabilities = Dashboard.capabilities(appHost);
+const capabilities = getCapabilities(appHost);
 
 export default new ServerConnections(
     credentialProvider,

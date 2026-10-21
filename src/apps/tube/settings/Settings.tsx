@@ -10,22 +10,19 @@ import { Link, useLocation } from 'react-router-dom';
 import Page from 'components/Page';
 import { useApi } from 'hooks/useApi';
 import globalize from 'lib/globalize';
-import * as userSettings from 'scripts/settings/userSettings';
-import Dashboard from 'utils/dashboard';
+import { logout } from 'utils/session';
 import { getAuthenticationApi } from 'utils/sdk/authentication-api';
 
 import { CURRENT_USER_KEY, useCurrentUser } from '../api';
 import { Section, Setting, useSavedFlash } from '../components/Form';
 import { uploadImage } from '../utils';
 import { useDocumentTitle } from '../hooks';
-import { DISPLAY_LANGUAGES } from './languages';
 
 import '../forms.scss';
 
 const SECTIONS = [
     { id: 'account', label: () => globalize.translate('Profile') },
     { id: 'playback', label: () => 'Playback' },
-    { id: 'display', label: () => globalize.translate('Display') },
     { id: 'quickconnect', label: () => globalize.translate('QuickConnect') }
 ];
 
@@ -216,30 +213,6 @@ const Playback: FC = () => {
     );
 };
 
-const Display: FC = () => {
-    const [ language, setLanguage ] = useState(() => userSettings.language() || '');
-    return (
-        <Section id='display' title={globalize.translate('Display')}>
-            <Setting label={globalize.translate('LabelDisplayLanguage')} help='The page reloads to apply it.' htmlFor='set-ui-lang'>
-                <select
-                    id='set-ui-lang'
-                    className='tb-input'
-                    value={language}
-                    onChange={e => {
-                        setLanguage(e.target.value);
-                        userSettings.language(e.target.value);
-                        // Translations are loaded once at startup
-                        window.setTimeout(() => window.location.reload(), 300);
-                    }}
-                >
-                    <option value=''>{globalize.translate('Auto')}</option>
-                    {DISPLAY_LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.name}</option>)}
-                </select>
-            </Setting>
-        </Section>
-    );
-};
-
 /** Approves a Quick Connect code shown on another device, signing it in as this user. */
 const QuickConnect: FC = () => {
     const { api } = useApi();
@@ -310,14 +283,13 @@ const Settings: FC = () => {
                         <Link key={s.id} to={`#${s.id}`} className={active === s.id ? 'is-active' : undefined}>{s.label()}</Link>
                     ))}
                     {user?.Policy?.IsAdministrator && <Link to='/dashboard'>{globalize.translate('TabDashboard')}</Link>}
-                    <button type='button' className='tb-btn tb-btn--small' style={{ marginTop: 12 }} onClick={() => Dashboard.logout()}>
+                    <button type='button' className='tb-btn tb-btn--small' style={{ marginTop: 12 }} onClick={logout}>
                         {globalize.translate('ButtonSignOut')}
                     </button>
                 </nav>
                 <div className='tb-settings__content'>
                     <Account />
                     <Playback />
-                    <Display />
                     <QuickConnect />
                 </div>
             </div>

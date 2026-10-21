@@ -1,130 +1,33 @@
 import isEmpty from 'lodash-es/isEmpty';
 
 import { EventType } from 'constants/eventType';
-import { currentSettings as userSettings } from 'scripts/settings/userSettings';
 import Events from 'utils/events';
-import { updateLocale } from 'utils/dateFnsLocale';
 import { importFromGlob } from '../../utils/globImport';
 
 const STRINGS = import.meta.glob('../../strings/*.json');
 
-const Direction = {
-    rtl: 'rtl',
-    ltr: 'ltr'
-};
-
 export const FALLBACK_CULTURE = 'en-us';
-const RTL_LANGS = ['ar', 'fa', 'ur', 'he'];
 
 const allTranslations = {};
 /**
- * The current application locale/language.
+ * The current application locale/language; the app is English only.
  * @type {string|undefined}
  */
 let currentCulture;
-let currentDateTimeCulture;
-let isRTL = false;
 
 export function getCurrentLocale() {
     return currentCulture;
 }
 
-export function getLanguages() {
-    const culture = currentCulture || FALLBACK_CULTURE;
-
-    const [ baseLang ] = culture.split('-');
-    if (baseLang && baseLang !== culture) {
-        return [ culture, baseLang ];
-    }
-    return [ culture ];
-}
-
 export function getCurrentDateTimeLocale() {
-    return currentDateTimeCulture;
-}
-
-export function getDefaultLanguage() {
-    const culture = document.documentElement.getAttribute('data-culture');
-    if (culture) {
-        return culture;
-    }
-
-    if (navigator.language) {
-        return navigator.language;
-    }
-    if (navigator.userLanguage) {
-        return navigator.userLanguage;
-    }
-    if (navigator.languages?.length) {
-        return navigator.languages[0];
-    }
-
-    return FALLBACK_CULTURE;
-}
-
-export function getIsRTL() {
-    return isRTL;
-}
-
-function checkAndProcessDir(culture) {
-    isRTL = false;
-    for (const lang of RTL_LANGS) {
-        if (culture.includes(lang)) {
-            isRTL = true;
-            break;
-        }
-    }
-
-    setDocumentDirection(isRTL ? Direction.rtl : Direction.ltr);
-}
-
-function setDocumentDirection(direction) {
-    document.getElementsByTagName('body')[0].setAttribute('dir', direction);
-    document.getElementsByTagName('html')[0].setAttribute('dir', direction);
-    if (direction === Direction.rtl) {
-        import('../../styles/rtl.scss');
-    }
-}
-
-export function getIsElementRTL(element) {
-    if (window.getComputedStyle) { // all browsers
-        return window.getComputedStyle(element, null).getPropertyValue('direction') == 'rtl';
-    }
-    return element.currentStyle.direction == 'rtl';
+    return currentCulture;
 }
 
 export function updateCurrentCulture() {
-    const lastCulture = currentCulture;
-    let culture;
-    try {
-        culture = userSettings.language();
-    } catch {
-        console.error('no language set in user settings');
-    }
-    culture = culture || getDefaultLanguage();
-    checkAndProcessDir(culture);
-
-    currentCulture = normalizeLocaleName(culture);
-
-    if (lastCulture !== currentCulture) {
-        document.documentElement.setAttribute('lang', currentCulture);
-        Events.trigger(document, EventType.LANGUAGE_CHANGE, [ currentCulture ]);
-    }
-
-    let dateTimeCulture;
-    try {
-        dateTimeCulture = userSettings.dateTimeLocale();
-    } catch {
-        console.error('no date format set in user settings');
-    }
-
-    if (dateTimeCulture) {
-        currentDateTimeCulture = normalizeLocaleName(dateTimeCulture);
-    } else {
-        currentDateTimeCulture = currentCulture;
-    }
-    updateLocale(currentDateTimeCulture);
-
+    if (currentCulture === FALLBACK_CULTURE) return;
+    currentCulture = FALLBACK_CULTURE;
+    document.documentElement.setAttribute('lang', 'en');
+    Events.trigger(document, EventType.LANGUAGE_CHANGE, [ currentCulture ]);
     ensureTranslations(currentCulture);
 }
 
@@ -303,12 +206,6 @@ export function defaultModule(val) {
 
 updateCurrentCulture();
 
-Events.on(userSettings, 'change', function (e, name) {
-    if (name === 'language' || name === 'datetimelocale') {
-        updateCurrentCulture();
-    }
-});
-
 export default {
     translate,
     translateHtml,
@@ -317,7 +214,5 @@ export default {
     getCurrentLocale,
     getCurrentDateTimeLocale,
     register,
-    updateCurrentCulture,
-    getIsRTL,
-    getIsElementRTL
+    updateCurrentCulture
 };

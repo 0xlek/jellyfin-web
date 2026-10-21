@@ -323,13 +323,13 @@
 
     /* Lists of servers or devices */
 
-    .tb-list {
+    .tb-rows {
         display: flex;
         flex-direction: column;
         gap: 4px;
     }
 
-    .tb-list__item {
+    .tb-row {
         display: flex;
         align-items: center;
         gap: 14px;
@@ -348,7 +348,7 @@
         }
     }
 
-    .tb-list__main {
+    .tb-row__main {
         display: flex;
         flex: 1;
         flex-direction: column;
@@ -362,12 +362,12 @@
         cursor: pointer;
     }
 
-    .tb-list__title {
+    .tb-row__title {
         font-weight: 600;
         overflow-wrap: anywhere;
     }
 
-    .tb-list__meta {
+    .tb-row__meta {
         color: var(--tb-text-2);
         font-size: 13px;
         overflow-wrap: anywhere;

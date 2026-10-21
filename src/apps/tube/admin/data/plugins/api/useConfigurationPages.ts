@@ -22,16 +22,18 @@ const fetchConfigurationPages = async (
 
 const getConfigurationPagesQuery = (
     api?: Api,
-    params?: PluginApiGetConfigurationPagesRequest
+    params?: PluginApiGetConfigurationPagesRequest,
+    enabled = true
 ) => queryOptions({
     queryKey: [ QueryKey.ConfigurationPages, params?.enableInMainMenu ],
     queryFn: ({ signal }) => fetchConfigurationPages(api!, params, { signal }),
-    enabled: !!api
+    enabled: !!api && enabled
 });
 
 export const useConfigurationPages = (
-    params?: PluginApiGetConfigurationPagesRequest
+    params?: PluginApiGetConfigurationPagesRequest,
+    enabled = true
 ) => {
     const { api } = useApi();
-    return useQuery(getConfigurationPagesQuery(api, params));
+    return useQuery(getConfigurationPagesQuery(api, params, enabled));
 };

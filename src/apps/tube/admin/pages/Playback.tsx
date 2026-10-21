@@ -6,6 +6,8 @@ import { TrickplayScanBehavior } from '@jellyfin/sdk/lib/generated-client/models
 import React, { type FC, useEffect, useState } from 'react';
 
 import { CODECS, HEVC_REXT_DECODING_TYPES, HEVC_VP9_HW_DECODING_TYPES } from 'apps/tube/admin/data/playback/constants/codecs';
+import { useConfiguration } from 'hooks/useConfiguration';
+import { useNamedConfiguration } from 'hooks/useNamedConfiguration';
 import globalize from 'lib/globalize';
 
 import { NumberSetting, type Option, Section, SelectSetting, Setting, SwitchSetting, TextSetting } from '../../components/Form';
@@ -18,8 +20,15 @@ const playbackTabs = (): Tab[] => [
     { to: '/dashboard/playback/trickplay', label: globalize.translate('Trickplay') }
 ];
 
+/** Loads the data of every playback tab into the cache. */
+const PlaybackWarm: FC = () => {
+    useConfiguration();
+    useNamedConfiguration('encoding');
+    return null;
+};
+
 const PlaybackPage: FC<{ children: React.ReactNode }> = ({ children }) => (
-    <AdminPage title={globalize.translate('TitlePlayback')} tabs={playbackTabs()}>{children}</AdminPage>
+    <AdminPage title={globalize.translate('TitlePlayback')} tabs={playbackTabs()} warm={PlaybackWarm}>{children}</AdminPage>
 );
 
 const plain = (values: string[]): Option[] => values.map(v => ({ value: v, label: v }));

@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import classNames from 'classnames';
 import type Hls from 'hls.js';
 import Screenfull from 'screenfull';
-import React, { type FC, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { type FC, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 
 import { useApi } from 'hooks/useApi';
 import globalize from 'lib/globalize';
@@ -530,6 +530,8 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onTo
                             max={1}
                             step={0.01}
                             value={isMuted ? 0 : Number(volume)}
+                            // Paints the track up to the current level
+                            style={{ '--fill': `${(isMuted ? 0 : Number(volume)) * 100}%` } as CSSProperties}
                             aria-label='Volume'
                             onChange={e => {
                                 setVolume(e.target.value);

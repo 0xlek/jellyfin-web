@@ -1,10 +1,6 @@
 /* Server administration pages, in the tube design */
 
 .tb-app {
-    .tb-guide--admin section + section {
-        display: block;
-    }
-
     .tb-admin {
         max-width: 1200px;
         margin: 0 auto;
@@ -196,7 +192,7 @@
         height: min(360px, 50vh);
         overflow-y: auto;
 
-        .tb-list__item {
+        .tb-row {
             min-height: 44px;
             cursor: pointer;
         }
@@ -245,13 +241,13 @@
 
     /* Cards and stats */
 
-    .tb-cards {
+    .tb-panels {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
         gap: 16px;
     }
 
-    .tb-card {
+    .tb-panel {
         display: flex;
         flex-direction: column;
         gap: 8px;
@@ -261,20 +257,20 @@
         background: var(--tb-surface);
     }
 
-    .tb-card__head {
+    .tb-panel__head {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 8px;
     }
 
-    .tb-card__title {
+    .tb-panel__title {
         font-size: 16px;
         font-weight: 600;
         overflow-wrap: anywhere;
     }
 
-    .tb-card__meta {
+    .tb-panel__meta {
         color: var(--tb-text-2);
         font-size: 13px;
         overflow-wrap: anywhere;

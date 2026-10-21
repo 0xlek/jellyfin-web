@@ -499,6 +499,17 @@ const PasswordTab: FC<{ user: UserDto }> = ({ user }) => {
     );
 };
 
+/** Loads what the other user tabs need into the cache. */
+const UserWarm: FC = () => {
+    useAuthProviders();
+    usePasswordResetProviders();
+    useLibraryMediaFolders({ isHidden: false });
+    useChannels();
+    useDevices({});
+    useParentalRatings();
+    return null;
+};
+
 const TABS = [
     { id: 'profile', label: 'Profile', Tab: ProfileTab },
     { id: 'access', label: 'TabAccess', Tab: AccessTab },
@@ -517,6 +528,7 @@ const UserEdit: FC = () => {
         <AdminPage
             title={user?.Name ?? ''}
             back={{ to: '/dashboard/users', label: globalize.translate('HeaderUsers') }}
+            warm={UserWarm}
             tabs={TABS.map(t => ({ to: `/dashboard/users/${userId}/${t.id}`, label: globalize.translate(t.label) }))}
             actions={user && <UserAvatar user={user} small />}
         >

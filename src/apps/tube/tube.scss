@@ -11,7 +11,7 @@
     --tb-accent-2: #aa5cc3;
     --tb-topbar-h: 56px;
     --tb-guide-w: 240px;
-    --tb-guide-mini-w: 72px;
+    --tb-guide-mini-w: 64px;
     --tb-radius: 12px;
     --tb-gap: 16px;
 
@@ -307,7 +307,13 @@
     font-weight: 600;
 }
 
-/* Guide (sidebar) */
+/* Scrolling to an anchor or a focused field stops clear of the fixed top bar */
+html {
+    scroll-padding-top: 72px;
+    scroll-padding-bottom: 24px;
+}
+
+/* Guide (side menu): pushes the content aside; an icon rail when collapsed */
 
 .tb-app__guide {
     position: fixed;
@@ -316,108 +322,104 @@
     left: 0;
     z-index: 50;
     width: var(--tb-guide-w);
-    overflow-y: auto;
+    overflow: hidden auto;
+    overscroll-behavior: contain;
     background: var(--tb-bg);
-    scrollbar-width: thin;
+    scrollbar-width: none;
+    transition: width 0.2s ease;
+}
+
+.tb-app__main {
+    min-height: 100vh;
+    min-height: 100dvh;
+    box-sizing: border-box;
+    padding-top: var(--tb-topbar-h);
+    padding-bottom: env(safe-area-inset-bottom);
+    margin-left: var(--tb-guide-w);
+    transition: margin-left 0.2s ease;
 }
 
 .tb-guide {
-    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 8px calc(24px + env(safe-area-inset-bottom));
+}
 
-    section {
-        padding-bottom: 12px;
-        margin-bottom: 12px;
-        border-bottom: 1px solid var(--tb-border);
+.tb-guide__section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 
-        &:last-child {
-            border-bottom: 0;
-        }
+    & + & {
+        padding-top: 12px;
+        border-top: 1px solid var(--tb-border);
     }
+}
 
-    h3 {
-        padding: 6px 12px;
-        font-size: 16px;
-    }
+.tb-guide__title {
+    padding: 2px 15px 6px;
+    overflow: hidden;
+    color: var(--tb-text-2);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
 }
 
 .tb-guide__entry {
     display: flex;
+    flex-shrink: 0;
     align-items: center;
-    gap: 24px;
+    gap: 16px;
     height: 40px;
-    padding: 0 12px;
-    border-radius: 10px;
 
-    span {
-        overflow: hidden;
-        white-space: nowrap;
-        text-overflow: ellipsis;
+    /* Keeps the icon in the same place in both states, so only the labels slide */
+    padding: 0 14px;
+    border-radius: 10px;
+    color: var(--tb-text-2);
+    white-space: nowrap;
+
+    svg {
+        flex-shrink: 0;
+        width: 20px;
+        height: 20px;
     }
 
     &:hover {
         background: var(--tb-hover);
+        color: var(--tb-text);
     }
 
     &.active {
-        background: var(--tb-hover);
+        background: var(--tb-active);
+        color: var(--tb-text);
         font-weight: 600;
     }
 }
 
-@mixin guide-mini {
+.tb-guide__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: opacity 0.15s ease;
+}
+
+.tb-app.is-guide-collapsed {
     .tb-app__guide {
         width: var(--tb-guide-mini-w);
-    }
 
-    .tb-guide {
-        padding: 4px;
-
-        section {
-            border: 0;
-            margin: 0;
-            padding: 0;
-        }
-
-        section + section,
-        h3 {
+        .tb-guide__title {
             display: none;
         }
-    }
 
-    .tb-guide__entry {
-        flex-direction: column;
-        justify-content: center;
-        gap: 6px;
-        height: 74px;
-        padding: 0 4px;
-        font-size: 10px;
-
-        span {
-            max-width: 100%;
-        }
-
-        &.active {
-            font-weight: 400;
+        .tb-guide__label {
+            opacity: 0;
         }
     }
 
     .tb-app__main {
         margin-left: var(--tb-guide-mini-w);
-    }
-}
-
-.tb-app__main {
-    padding-top: var(--tb-topbar-h);
-    margin-left: var(--tb-guide-w);
-}
-
-.tb-app.is-guide-mini {
-    @include guide-mini;
-}
-
-@media (max-width: 1312px) {
-    .tb-app {
-        @include guide-mini;
     }
 }
 
@@ -433,8 +435,11 @@
     }
 }
 
-.tb-app.is-watch .tb-app__main {
-    margin-left: 0;
+@media (prefers-reduced-motion: reduce) {
+    .tb-app__guide,
+    .tb-app__main {
+        transition: none;
+    }
 }
 
 .tb-drawer {
@@ -459,6 +464,7 @@
     height: 100%;
     padding-top: var(--tb-topbar-h);
     overflow-y: auto;
+    overscroll-behavior: contain;
     background: var(--tb-bg);
     animation: tb-slide-in 0.2s ease-out;
 }
@@ -875,6 +881,8 @@
 /* Watch page */
 
 .tb-watch {
+    /* Its layout follows the space beside the menu, not the window */
+    container-type: inline-size;
     padding: 0;
 }
 
@@ -923,7 +931,7 @@
     }
 }
 
-@media (max-width: 1016px) {
+@container (max-width: 1016px) {
     .tb-watch__layout,
     .tb-watch.is-theater .tb-watch__layout {
         grid-template-columns: minmax(0, 1fr);
@@ -1248,13 +1256,19 @@
         &::-webkit-slider-runnable-track {
             height: 3px;
             border-radius: 2px;
-            background: rgba(255, 255, 255, 0.4);
+            background: linear-gradient(to right, #fff var(--fill, 100%), rgba(255, 255, 255, 0.4) var(--fill, 100%));
         }
 
         &::-moz-range-track {
             height: 3px;
             border-radius: 2px;
             background: rgba(255, 255, 255, 0.4);
+        }
+
+        &::-moz-range-progress {
+            height: 3px;
+            border-radius: 2px;
+            background: #fff;
         }
 
         &::-webkit-slider-thumb {
@@ -1501,4 +1515,50 @@
     0% { opacity: 0; }
     20% { opacity: 1; }
     100% { opacity: 0; }
+}
+
+/* Up next and the playlist: a box about five items tall; the playing item stays pinned while scrolled away */
+.tb-upnext {
+    position: relative;
+
+    /* Five compact rows */
+    max-height: 456px;
+    padding: 8px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: var(--tb-radius);
+    background: var(--tb-surface);
+    scrollbar-width: thin;
+    gap: 4px;
+
+    .tb-card--compact {
+        padding: 6px;
+        border-radius: 10px;
+
+        &:hover {
+            background: var(--tb-hover);
+        }
+
+        .tb-thumb {
+            width: 128px;
+        }
+
+        .tb-card__title {
+            font-size: 13px;
+            line-height: 18px;
+        }
+    }
+
+    .tb-card--compact.is-current {
+        position: sticky;
+        top: -8px;
+        bottom: -8px;
+        z-index: 1;
+        background: var(--tb-surface-2);
+        box-shadow: inset 3px 0 0 var(--tb-accent), 0 4px 12px rgba(0, 0, 0, 0.4);
+
+        .tb-card__index {
+            color: var(--tb-accent);
+        }
+    }
 }

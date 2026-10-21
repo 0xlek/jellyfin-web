@@ -1,7 +1,5 @@
 import type { UserDto } from '@jellyfin/sdk/lib/generated-client/models/user-dto';
 import { useQuery } from '@tanstack/react-query';
-import createDOMPurify from 'dompurify';
-import markdownIt from 'markdown-it';
 import React, { type FC, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -14,7 +12,11 @@ import { useDocumentTitle } from '../hooks';
 import { getServerApi, getServerClient } from './connection';
 
 const QUICK_CONNECT_POLL_MS = 5000;
-const domPurify = createDOMPurify();
+/** Admins write the disclaimer in Markdown with HTML; DOMPurify strips anything unsafe. Loaded only when there is one. */
+const renderDisclaimer = async (markdown: string) => {
+    const [ { default: createDOMPurify }, { default: markdownIt } ] = await Promise.all([ import('dompurify'), import('markdown-it') ]);
+    return createDOMPurify().sanitize(markdownIt({ html: true }).render(markdown));
+};
 
 type HttpError = { status?: number };
 
@@ -90,9 +92,8 @@ const Login: FC = () => {
         queryKey: [ 'Tube', 'LoginDisclaimer', serverId ],
         queryFn: async () => {
             const branding = await client.getJSON(client.getUrl('Branding/Configuration')) as { LoginDisclaimer?: string };
-            // Admins write the disclaimer in Markdown with HTML; DOMPurify strips anything unsafe
-            // eslint-disable-next-line sonarjs/disabled-auto-escaping
-            return branding.LoginDisclaimer ? domPurify.sanitize(markdownIt({ html: true }).render(branding.LoginDisclaimer)) : '';
+
+            return branding.LoginDisclaimer ? renderDisclaimer(branding.LoginDisclaimer) : '';
         },
         enabled: !!client
     });

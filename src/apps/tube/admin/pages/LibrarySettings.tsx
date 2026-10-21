@@ -10,14 +10,14 @@ import globalize from 'lib/globalize';
 
 import { NumberSetting, Section, SelectSetting, SwitchSetting } from '../../components/Form';
 import { AdminPage, NamedConfigForm, ServerConfigForm } from '../kit';
-import { libraryTabs } from './Libraries';
+import { LibrariesWarm, libraryTabs } from './Libraries';
 
 const DISPLAY_FIELDS = [
     'EnableFolderView', 'DisplaySpecialsWithinSeasons', 'EnableGroupingMoviesIntoCollections', 'EnableGroupingShowsIntoCollections', 'EnableExternalContentInSuggestions'
 ] as const;
 
 export const LibraryDisplay: FC = () => (
-    <AdminPage title={globalize.translate('HeaderLibraries')} tabs={libraryTabs()}>
+    <AdminPage title={globalize.translate('HeaderLibraries')} tabs={libraryTabs()} warm={LibrariesWarm}>
         <div className='tb-admin__form'>
             <ServerConfigForm fields={DISPLAY_FIELDS}>
                 {(c, set) => (
@@ -59,7 +59,7 @@ export const LibraryMetadata: FC = () => {
     const countryOptions = useMemo(() => (countries ?? []).map(c => ({ value: c.TwoLetterISORegionName ?? '', label: c.DisplayName ?? '' })), [ countries ]);
 
     return (
-        <AdminPage title={globalize.translate('HeaderLibraries')} tabs={libraryTabs()}>
+        <AdminPage title={globalize.translate('HeaderLibraries')} tabs={libraryTabs()} warm={LibrariesWarm}>
             <ServerConfigForm fields={METADATA_FIELDS}>
                 {(c, set) => (
                     <>
@@ -90,7 +90,7 @@ export const LibraryNfo: FC = () => {
     const userOptions = [ { value: '', label: globalize.translate('None') }, ...(users ?? []).map(u => ({ value: u.Id ?? '', label: u.Name ?? '' })) ];
 
     return (
-        <AdminPage title={globalize.translate('HeaderLibraries')} tabs={libraryTabs()}>
+        <AdminPage title={globalize.translate('HeaderLibraries')} tabs={libraryTabs()} warm={LibrariesWarm}>
             <NamedConfigForm<XbmcMetadataOptions> name='xbmcmetadata'>
                 {(c, set) => (
                     <Section title={globalize.translate('TabNfoSettings')}>

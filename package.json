@@ -1,8 +1,8 @@
 {
   "name": "jellyfin-web",
   "version": "13.0.0",
-  "description": "Web interface for Jellyfin",
-  "repository": "https://github.com/jellyfin/jellyfin-web",
+  "description": "Video-first web client for Jellyfin-compatible media servers",
+  "repository": "https://github.com/0xlek/jellyfin-web",
   "license": "GPL-2.0-or-later",
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "4.7.2",
@@ -46,12 +46,7 @@
     "vitest": "4.1.11"
   },
   "dependencies": {
-    "@fontsource/noto-sans": "5.3.0",
-    "@fontsource/noto-sans-hk": "5.3.0",
-    "@fontsource/noto-sans-jp": "5.3.0",
-    "@fontsource/noto-sans-kr": "5.3.0",
-    "@fontsource/noto-sans-sc": "5.3.0",
-    "@fontsource/noto-sans-tc": "5.3.0",
+    "@fontsource-variable/inter": "5.3.0",
     "@jellyfin/sdk": "0.0.0-unstable.202609160935",
     "@jellyfin/ux-web": "1.0.0",
     "@remix-run/router": "1.23.4",

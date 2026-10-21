@@ -38,7 +38,7 @@ const LastRun: FC<{ task: TaskInfo }> = ({ task }) => {
     if (!result?.StartTimeUtc || !result.EndTimeUtc) return null;
     const took = formatDistance(new Date(result.StartTimeUtc), new Date(result.EndTimeUtc));
     return (
-        <span className='tb-list__meta'>
+        <span className='tb-row__meta'>
             {globalize.translate('LabelScheduledTaskLastRan', formatAgo(result.EndTimeUtc), took)}
             {result.Status === 'Failed' && <> <span className='tb-badge tb-badge--error'>{globalize.translate('LabelFailed')}</span></>}
             {result.Status === 'Cancelled' && <> <span className='tb-badge'>{globalize.translate('LabelCancelled')}</span></>}
@@ -75,11 +75,11 @@ export const Tasks: FC = () => {
                     {getCategories(tasks).map(category => (
                         <section key={category} className='tb-settings__section'>
                             <div className='tb-settings__heading'><h2>{category}</h2></div>
-                            <div className='tb-list'>
+                            <div className='tb-rows'>
                                 {getTasksByCategory(tasks, category).map(task => (
-                                    <div key={task.Id} className='tb-list__item' style={{ alignItems: 'center' }}>
-                                        <Link to={`/dashboard/tasks/${task.Id}`} className='tb-list__main' style={{ gap: 4 }}>
-                                            <span className='tb-list__title'>{task.Name}</span>
+                                    <div key={task.Id} className='tb-row' style={{ alignItems: 'center' }}>
+                                        <Link to={`/dashboard/tasks/${task.Id}`} className='tb-row__main' style={{ gap: 4 }}>
+                                            <span className='tb-row__title'>{task.Name}</span>
                                             <LastRun task={task} />
                                         </Link>
                                         <RunButton task={task} />
@@ -207,14 +207,14 @@ export const Task: FC = () => {
                     <p className='tb-muted'>{task.Description}</p>
                     <div style={{ margin: '8px 0 24px' }}><LastRun task={task} /></div>
                     <Section title={globalize.translate('HeaderTaskTriggers')}>
-                        <div className='tb-list'>
+                        <div className='tb-rows'>
                             {task.Triggers?.map((t, i) => (
                                 // eslint-disable-next-line react/no-array-index-key
-                                <div key={i} className='tb-list__item'>
+                                <div key={i} className='tb-row'>
                                     <Icon name='clock' />
-                                    <span className='tb-list__main' style={{ cursor: 'default' }}>
-                                        <span className='tb-list__title'>{getTriggerFriendlyName(t, dateFnsLocale)}</span>
-                                        {!!t.MaxRuntimeTicks && <span className='tb-list__meta'>{globalize.translate('LabelTimeLimitHours')} {t.MaxRuntimeTicks / 36e9}</span>}
+                                    <span className='tb-row__main' style={{ cursor: 'default' }}>
+                                        <span className='tb-row__title'>{getTriggerFriendlyName(t, dateFnsLocale)}</span>
+                                        {!!t.MaxRuntimeTicks && <span className='tb-row__meta'>{globalize.translate('LabelTimeLimitHours')} {t.MaxRuntimeTicks / 36e9}</span>}
                                     </span>
                                     <button type='button' className='tb-icon-btn' title={globalize.translate('ButtonRemove')} onClick={() => { void onRemove(t); }}><Icon name='trash' /></button>
                                 </div>
