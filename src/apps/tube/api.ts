@@ -34,7 +34,6 @@ const DETAIL_FIELDS = [
     ItemFields.People,
     ItemFields.Studios,
     ItemFields.RecursiveItemCount,
-    ItemFields.Trickplay,
     ItemFields.MediaSources
 ];
 

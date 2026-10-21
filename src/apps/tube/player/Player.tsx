@@ -13,13 +13,29 @@ import { TUBE_KEY } from '../api';
 import { isTyping, useDismiss, useStoredState } from '../hooks';
 import Icon from '../icons';
 import { formatClock, secondsToTicks, ticksToSeconds } from '../utils';
-import { getPlaybackSource, type PlaybackSource } from './source';
+import { getPlaybackSource, type PlaybackSource, type SubtitleTrack } from './source';
+import { loadTrackPrefs, matchTrack, saveTrackPrefs, toPick, type TrackPrefs } from './tracks';
 
 const PROGRESS_INTERVAL_MS = 10_000;
 const IDLE_HIDE_MS = 2500;
+const DOUBLE_TAP_MS = 300;
+const FLASH_MS = 600;
+const SPEEDS = [ 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2 ];
+
+const initialSubtitle = (tracks: SubtitleTrack[], prefs: TrackPrefs) => {
+    if (prefs.subtitle === null) return -1;
+    const remembered = matchTrack(tracks, prefs.subtitle);
+    return tracks.indexOf(remembered ?? tracks.find(t => t.isDefault)!);
+};
+
+// Firefox has no API, only its own overlay button; the control is hidden there
+// eslint-disable-next-line compat/compat
+const canPip = typeof document !== 'undefined' && document.pictureInPictureEnabled === true;
 
 type PlayerProps = {
     item: BaseItemDto
+    /** Audio and subtitle choices carry over between videos of this group (show or folder). */
+    trackGroup: string
     startSeconds?: number
     theater: boolean
     onToggleTheater: () => void
@@ -27,7 +43,7 @@ type PlayerProps = {
     onNext?: () => void
 };
 
-const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater, onEnded, onNext }) => {
+const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onToggleTheater, onEnded, onNext }) => {
     const { api, user } = useApi();
     const queryClient = useQueryClient();
     const rootRef = useRef<HTMLDivElement>(null);
@@ -58,6 +74,11 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
     useDismiss(menuRef, menuOpen, closeMenu);
     const [ volume, setVolume ] = useStoredState('tube-volume', '1');
     const [ muted, setMuted ] = useStoredState('tube-muted', 'false');
+    const [ speed, setSpeed ] = useStoredState('tube-speed', '1');
+    const [ pip, setPip ] = useState(false);
+    /** A short overlay such as "+10s" or "1.5x"; the key restarts its animation. */
+    const [ flash, setFlash ] = useState<{ text: string, side: number, key: number }>();
+    const flashTimer = useRef<number>();
 
     // Negotiate the stream, attach it, and report the session to the server.
     useEffect(() => {
@@ -70,6 +91,8 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
         let progressTimer: number | undefined;
         let current: PlaybackSource | undefined;
 
+        const userId = user.Id;
+        const prefs = loadTrackPrefs(trackGroup);
         const from = restartAt.current ?? startSeconds;
         restartAt.current = undefined;
 
@@ -107,11 +130,17 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
             video.play().catch(() => setWaiting(false));
         };
 
-        getPlaybackSource(api, user.Id, item, audioIndex)
-            .then(async result => {
+        getPlaybackSource(api, userId, item, audioIndex)
+            .then(async first => {
+                // Play the audio track picked earlier in this show; matching it needs the file's track list
+                const remembered = audioIndex === undefined ? matchTrack(first.audioTracks, prefs.audio) : undefined;
+                const result = remembered && remembered.index !== first.audioStreamIndex ?
+                    await getPlaybackSource(api, userId, item, remembered.index) :
+                    first;
                 if (cancelled) return;
                 current = result;
                 setSource(result);
+                if (audioIndex === undefined) setSubtitle(initialSubtitle(result.subtitles, prefs));
                 video.addEventListener('loadedmetadata', start, { once: true });
 
                 if (result.isHls && !video.canPlayType('application/vnd.apple.mpegurl')) {
@@ -169,8 +198,38 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
         });
     }, [ subtitle, source ]);
 
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        video.defaultPlaybackRate = Number(speed);
+        video.playbackRate = Number(speed);
+    }, [ speed, source ]);
+
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        const onEnter = () => setPip(true);
+        const onLeave = () => setPip(false);
+        video.addEventListener('enterpictureinpicture', onEnter);
+        video.addEventListener('leavepictureinpicture', onLeave);
+        return () => {
+            video.removeEventListener('enterpictureinpicture', onEnter);
+            video.removeEventListener('leavepictureinpicture', onLeave);
+        };
+    }, []);
+
+    const showFlash = useCallback((text: string, side = 0) => {
+        setFlash({ text, side, key: Date.now() });
+        window.clearTimeout(flashTimer.current);
+        flashTimer.current = window.setTimeout(() => setFlash(undefined), FLASH_MS);
+    }, []);
+
+    useEffect(() => () => window.clearTimeout(flashTimer.current), []);
+
     const chooseAudio = (index: number) => {
         setMenuOpen(false);
+        const track = source?.audioTracks.find(t => t.index === index);
+        if (track) saveTrackPrefs(trackGroup, { audio: toPick(track) });
         if (index === source?.audioStreamIndex) return;
         restartAt.current = videoRef.current?.currentTime;
         setAudioIndex(index);
@@ -178,13 +237,29 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
 
     // c toggles subtitles: back to the last chosen track, or the first one
     const lastSubtitle = useRef(0);
-    const toggleSubtitles = useCallback(() => setSubtitle(current => {
-        if (current >= 0) {
-            lastSubtitle.current = current;
-            return -1;
-        }
-        return lastSubtitle.current;
-    }), []);
+    const pickSubtitle = useCallback((index: number) => {
+        const track = source?.subtitles[index];
+        setSubtitle(track ? index : -1);
+        saveTrackPrefs(trackGroup, { subtitle: track ? toPick(track) : null });
+    }, [ trackGroup, source ]);
+    const toggleSubtitles = useCallback(() => {
+        if (subtitle >= 0) lastSubtitle.current = subtitle;
+        pickSubtitle(subtitle >= 0 ? -1 : lastSubtitle.current);
+    }, [ subtitle, pickSubtitle ]);
+
+    const stepSpeed = useCallback((direction: number) => {
+        const at = SPEEDS.indexOf(Number(speed));
+        const next = SPEEDS[Math.min(Math.max((at < 0 ? SPEEDS.indexOf(1) : at) + direction, 0), SPEEDS.length - 1)];
+        setSpeed(String(next));
+        showFlash(`${next}x`);
+    }, [ speed, setSpeed, showFlash ]);
+
+    const togglePip = useCallback(() => {
+        const video = videoRef.current;
+        if (!canPip || !video) return;
+        if (document.pictureInPictureElement) void document.exitPictureInPicture().catch(() => undefined);
+        else void video.requestPictureInPicture().catch(() => undefined);
+    }, []);
 
     useEffect(() => {
         if (!Screenfull.isEnabled) return;
@@ -235,7 +310,8 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
             f: toggleFullscreen,
             m: toggleMute,
             t: onToggleTheater,
-            c: toggleSubtitles
+            c: toggleSubtitles,
+            i: togglePip
         };
         const whenFocused: Record<string, () => void> = {
             ' ': togglePlay,
@@ -249,6 +325,7 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
             const key = e.key.toLowerCase();
             const length = videoRef.current?.duration;
             if (e.shiftKey && key === 'n') return onNext;
+            if (key === '>' || key === '<') return () => stepSpeed(key === '>' ? 1 : -1);
             if (/^\d$/.test(key) && length) return () => seekTo(length * Number(key) / 10);
             if (rootRef.current?.contains(document.activeElement) && whenFocused[key]) return whenFocused[key];
             return anywhere[key];
@@ -264,7 +341,7 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
         };
         document.addEventListener('keydown', onKey);
         return () => document.removeEventListener('keydown', onKey);
-    }, [ togglePlay, seekBy, seekTo, toggleFullscreen, toggleMute, onToggleTheater, onNext, setVolume, wake, toggleSubtitles ]);
+    }, [ togglePlay, seekBy, seekTo, toggleFullscreen, toggleMute, onToggleTheater, onNext, setVolume, wake, toggleSubtitles, togglePip, stepSpeed ]);
 
     const fractionAt = (clientX: number) => {
         const rect = barRef.current!.getBoundingClientRect();
@@ -295,6 +372,36 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
     };
 
     const showControls = !playing || !idle || scrubbing || menuOpen;
+
+    // Touch: tap shows the controls (or plays/pauses when they are up), double tap on a side skips 10s like YouTube
+    const pointerType = useRef('mouse');
+    const lastTap = useRef<{ at: number, side: number }>();
+    const tapTimer = useRef<number>();
+    useEffect(() => () => window.clearTimeout(tapTimer.current), []);
+    const onVideoPointerUp = (e: ReactPointerEvent<HTMLVideoElement>) => {
+        pointerType.current = e.pointerType;
+        if (e.pointerType !== 'touch') return;
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = (e.clientX - rect.left) / rect.width;
+        let side = 0;
+        if (x < 1 / 3) side = -1;
+        else if (x > 2 / 3) side = 1;
+        const now = performance.now();
+        const previous = lastTap.current;
+        lastTap.current = { at: now, side };
+        window.clearTimeout(tapTimer.current);
+        if (side && previous?.side === side && now - previous.at < DOUBLE_TAP_MS) {
+            seekBy(side * 10);
+            showFlash(side < 0 ? '−10s' : '+10s', side);
+            return;
+        }
+        const controlsUp = showControls;
+        tapTimer.current = window.setTimeout(() => {
+            if (controlsUp) togglePlay();
+            wake();
+        }, side ? DOUBLE_TAP_MS : 0);
+    };
+
     const isMuted = muted === 'true' || Number(volume) === 0;
     const played = duration ? (time / duration) * 100 : 0;
 
@@ -313,8 +420,9 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
                 className='tb-player__video'
                 playsInline
                 crossOrigin='anonymous'
-                onClick={togglePlay}
-                onDoubleClick={toggleFullscreen}
+                onPointerUp={onVideoPointerUp}
+                onClick={() => pointerType.current !== 'touch' && togglePlay()}
+                onDoubleClick={() => pointerType.current !== 'touch' && toggleFullscreen()}
                 onPlay={() => setPlaying(true)}
                 onPause={() => setPlaying(false)}
                 onWaiting={() => setWaiting(true)}
@@ -334,6 +442,11 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
 
             {waiting && !error && <div className='tb-player__spinner' aria-label='Loading' />}
             {error && <div className='tb-player__error'>{error}</div>}
+            {flash && (
+                <div key={flash.key} className={classNames('tb-player__flash', { 'is-back': flash.side < 0, 'is-forward': flash.side > 0 })}>
+                    {flash.text}
+                </div>
+            )}
 
             <div className='tb-player__chrome'>
                 <div
@@ -399,7 +512,7 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
                             <Icon name='cc' />
                         </button>
                     )}
-                    {(source && (source.audioTracks.length > 1 || source.subtitles.length > 0)) && (
+                    {source && (
                         <div ref={menuRef} className='tb-player__menu-anchor'>
                             <button
                                 className={classNames('tb-ctl', { 'is-on': menuOpen })}
@@ -431,17 +544,38 @@ const Player: FC<PlayerProps> = ({ item, startSeconds, theater, onToggleTheater,
                                     {source.subtitles.length > 0 && (
                                         <section className='tb-player__menu-group'>
                                             <h4>{globalize.translate('Subtitles')}</h4>
-                                            <button className='tb-player__menu-item' role='menuitemradio' aria-checked={subtitle < 0} onClick={() => setSubtitle(-1)}>Off</button>
+                                            <button className='tb-player__menu-item' role='menuitemradio' aria-checked={subtitle < 0} onClick={() => pickSubtitle(-1)}>Off</button>
                                             {source.subtitles.map((track, i) => (
-                                                <button key={track.index} className='tb-player__menu-item' role='menuitemradio' aria-checked={subtitle === i} onClick={() => setSubtitle(i)}>
+                                                <button key={track.index} className='tb-player__menu-item' role='menuitemradio' aria-checked={subtitle === i} onClick={() => pickSubtitle(i)}>
                                                     {track.label}
                                                 </button>
                                             ))}
                                         </section>
                                     )}
+                                    <section className='tb-player__menu-group'>
+                                        <h4>Speed</h4>
+                                        <div className='tb-player__speeds'>
+                                            {SPEEDS.map(rate => (
+                                                <button
+                                                    key={rate}
+                                                    className='tb-player__menu-item'
+                                                    role='menuitemradio'
+                                                    aria-checked={Number(speed) === rate}
+                                                    onClick={() => setSpeed(String(rate))}
+                                                >
+                                                    {rate === 1 ? 'Normal' : `${rate}x`}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </section>
                                 </div>
                             )}
                         </div>
+                    )}
+                    {canPip && (
+                        <button className={classNames('tb-ctl', { 'is-on': pip })} aria-label='Picture in picture (i)' aria-pressed={pip} onClick={togglePip}>
+                            <Icon name='pip' />
+                        </button>
                     )}
                     {!fullscreen && (
                         <button className='tb-ctl' aria-label={theater ? 'Default view (t)' : 'Theater mode (t)'} onClick={onToggleTheater}>

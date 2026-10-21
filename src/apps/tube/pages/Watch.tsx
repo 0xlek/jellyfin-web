@@ -115,7 +115,7 @@ const Watch: FC = () => {
     const t = Number(params.get('t')) || undefined;
     const { data: item, error } = useItem(id);
     // A video inside a directory plays that directory as its playlist
-    const { data: collectionOf } = useCollectionOf(item);
+    const { data: collectionOf, isPending: findingCollection } = useCollectionOf(item);
     const listId = params.get('list') ?? collectionOf?.folder.Id;
     const { data: playlist } = useCollectionVideos(listId ?? undefined);
     const { data: upNext } = useUpNext(playlist ? undefined : item);
@@ -143,16 +143,19 @@ const Watch: FC = () => {
     if (!id) return <Navigate replace to='/home' />;
 
     const isTheater = theater === 'true';
+    // A folder video's track choices belong to its folder, so wait for it unless the link names it
+    const trackGroup = item?.SeriesId ?? listId ?? (findingCollection && item?.Type === BaseItemKind.Video ? undefined : item?.Id);
 
     // One grid: theater mode only changes the grid areas, so the player never remounts mid-stream
     return (
         <Page id='tubeWatch' className={classNames('tb-page tb-watch', { 'is-theater': isTheater })} isNowPlayingBarEnabled={false}>
             <div className='tb-watch__layout'>
                 <div className='tb-watch__frame'>
-                    {item && (
+                    {item && trackGroup && (
                         <Player
                             key={item.Id}
                             item={item}
+                            trackGroup={trackGroup}
                             startSeconds={resumeAt}
                             theater={isTheater}
                             onToggleTheater={toggleTheater}

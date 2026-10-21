@@ -28,6 +28,7 @@ const PATHS = {
     mute: 'M4 9h4l5-4v14l-5-4H4zM16 9l5 6M21 9l-5 6',
     cc: 'M3 6h18v12H3zM10 10.5a2 2 0 1 0 0 3M17 10.5a2 2 0 1 0 0 3',
     theater: 'M3 7h18v10H3z',
+    pip: 'M3 5h18v14H3zM12 12h7v5h-7z',
     fullscreen: 'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5',
     exitFullscreen: 'M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5',
     chevronDown: 'M6 9l6 6 6-6'

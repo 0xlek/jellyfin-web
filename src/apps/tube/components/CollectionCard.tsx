@@ -5,6 +5,7 @@ import { useApi } from 'hooks/useApi';
 
 import type { Collection } from '../catalog';
 import Icon from '../icons';
+import { WatchedMark } from './VideoCard';
 import { formatAdded, thumbUrl } from '../utils';
 
 /** A directory of videos, drawn like a YouTube playlist: stacked thumbnail and a video count. */
@@ -19,12 +20,13 @@ const CollectionCard: FC<{ collection: Collection }> = ({ collection }) => {
                 {src ?
                     <img className='tb-thumb__img' src={src} alt='' loading='lazy' decoding='async' /> :
                     <div className='tb-thumb__placeholder'>{collection.name[0]}</div>}
-                <span className='tb-thumb__badge tb-thumb__badge--count'>
-                    <Icon name='playlist' className='tb-thumb__badge-icon' />{collection.count} {collection.count === 1 ? 'video' : 'videos'}
-                </span>
+                {watched && <WatchedMark />}
                 {collection.playedCount > 0 && (
                     <div className='tb-thumb__progress'><span style={{ width: `${(collection.playedCount / collection.count) * 100}%` }} /></div>
                 )}
+                <span className='tb-thumb__badge tb-thumb__badge--count'>
+                    <Icon name='playlist' className='tb-thumb__badge-icon' />{collection.count} {collection.count === 1 ? 'video' : 'videos'}
+                </span>
             </div>
             <div className='tb-card__details'>
                 <div className='tb-card__text'>

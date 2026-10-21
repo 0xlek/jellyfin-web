@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 
 import { useApi } from 'hooks/useApi';
 
+import Icon from '../icons';
 import { avatarUrl, channelName, formatClock, itemLink, metaLine, playedPercent, thumbUrl, ticksToSeconds } from '../utils';
 
 type VideoCardProps = {
@@ -19,6 +20,10 @@ type VideoCardProps = {
     /** Position in a playlist, shown before the thumbnail. */
     index?: number
 };
+
+export const WatchedMark: FC = () => (
+    <span className='tb-thumb__watched' title='Watched'><Icon name='check' /></span>
+);
 
 const Thumb: FC<{ item: BaseItemDto }> = ({ item }) => {
     const { api } = useApi();
@@ -38,10 +43,11 @@ const Thumb: FC<{ item: BaseItemDto }> = ({ item }) => {
             {src && !failed ?
                 <img className='tb-thumb__img' src={src} alt='' loading='lazy' decoding='async' onError={() => setFailed(true)} /> :
                 <div className='tb-thumb__placeholder'>{item.Name?.[0]}</div>}
-            {badge && <span className='tb-thumb__badge'>{badge}</span>}
+            {item.UserData?.Played && <WatchedMark />}
             {percent > 0 && (
                 <div className='tb-thumb__progress'><span style={{ width: `${percent}%` }} /></div>
             )}
+            {badge && <span className='tb-thumb__badge'>{badge}</span>}
         </div>
     );
 };
