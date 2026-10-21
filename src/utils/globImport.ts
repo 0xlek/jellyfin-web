@@ -8,8 +8,10 @@ const SUFFIXES = [ '', '.js', '.ts', '.tsx', '.jsx', '/index.js', '/index.ts', '
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const importFromGlob = <T = any>(modules: Record<string, Loader>, base: string, spec: string): Promise<T> => {
+    // An empty spec is the directory itself (an index route), without a doubled slash
+    const stem = spec ? `${base}${spec}` : base.replace(/\/$/, '');
     for (const suffix of SUFFIXES) {
-        const load = modules[`${base}${spec}${suffix}`];
+        const load = modules[`${stem}${suffix}`];
         if (load) return load() as Promise<T>;
     }
     return Promise.reject(new Error(`Module not found: ${base}${spec}`));
