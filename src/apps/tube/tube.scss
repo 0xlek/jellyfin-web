@@ -881,6 +881,9 @@
 .tb-watch__layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 402px;
+
+    /* The playlist spans both rows; its extra height must go below the details, not between them and the player */
+    grid-template-rows: auto 1fr;
     grid-template-areas:
         'frame side'
         'primary side';
@@ -924,6 +927,7 @@
     .tb-watch__layout,
     .tb-watch.is-theater .tb-watch__layout {
         grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: none;
         grid-template-areas:
             'frame'
             'primary'
