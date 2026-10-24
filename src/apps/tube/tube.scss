@@ -1842,3 +1842,14 @@ html {
         min-height: 48px;
     }
 }
+
+/* The last frame of the old stream, held while a quality or audio switch loads the new one */
+.tb-player__held {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+}

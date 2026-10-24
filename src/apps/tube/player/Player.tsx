@@ -17,7 +17,7 @@ import { TUBE_KEY } from '../api';
 import { isTyping, useDismiss, useMediaQuery, useStoredState } from '../hooks';
 import Icon from '../icons';
 import { channelName, formatClock, secondsToTicks, thumbUrl, ticksToSeconds } from '../utils';
-import { getPlaybackSource, type PlaybackSource, type SubtitleTrack } from './source';
+import { getPlaybackSource, type PlaybackSource, qualitiesFor, type SubtitleTrack } from './source';
 import { loadTrackPrefs, matchTrack, saveTrackPrefs, toPick, type TrackPrefs } from './tracks';
 import TouchControls from './TouchControls';
 import { getTrickplay, previewCell } from './trickplay';
@@ -100,8 +100,15 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, ownSeconds, o
     const [ audioIndex, setAudioIndex ] = useState<number>();
     const [ menuOpen, setMenuOpen ] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
-    // Switching audio reloads the stream; it continues from here instead of the resume point
+    // Switching audio or quality reloads the stream; it continues from here instead of the resume point,
+    // paused if it was, with the last frame held on screen until the new stream shows one
     const restartAt = useRef<number>();
+    const restartPaused = useRef(false);
+    const [ heldFrame, setHeldFrame ] = useState<string>();
+    // Remembered across videos like YouTube's; a file no taller than the choice plays as the original
+    const [ qualityKey, setQualityKey ] = useStoredState('tube-quality', 'original');
+    const fileHeight = item.MediaSources?.[0]?.MediaStreams?.find(s => s.Type === 'Video')?.Height ?? undefined;
+    const quality = qualitiesFor(fileHeight).find(q => String(q.height) === qualityKey);
     const closeMenu = useCallback(() => setMenuOpen(false), []);
     useDismiss(menuRef, menuOpen, closeMenu);
     const [ volume, setVolume ] = useStoredState('tube-volume', '1');
@@ -177,15 +184,20 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, ownSeconds, o
 
         const start = () => {
             if (from) video.currentTime = from;
+            if (restartPaused.current) {
+                restartPaused.current = false;
+                setWaiting(false);
+                return;
+            }
             video.play().catch(() => setWaiting(false));
         };
 
-        getPlaybackSource(api, userId, item, audioIndex)
+        getPlaybackSource(api, userId, item, audioIndex, quality)
             .then(async first => {
                 // Play the audio track picked earlier in this show; matching it needs the file's track list
                 const remembered = audioIndex === undefined ? matchTrack(first.audioTracks, prefs.audio) : undefined;
                 const result = remembered && remembered.index !== first.audioStreamIndex ?
-                    await getPlaybackSource(api, userId, item, remembered.index) :
+                    await getPlaybackSource(api, userId, item, remembered.index, quality) :
                     first;
                 if (cancelled) return;
                 current = result;
@@ -232,7 +244,7 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, ownSeconds, o
         };
     // The stream is negotiated once per item and audio track; a new start time alone is a seek, not a reload.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ api, user?.Id, item.Id, audioIndex ]);
+    }, [ api, user?.Id, item.Id, audioIndex, quality?.height ]);
 
     useEffect(() => {
         const video = videoRef.current;
@@ -303,13 +315,37 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, ownSeconds, o
 
     useEffect(() => () => window.clearTimeout(flashTimer.current), []);
 
+    const prepareRestart = () => {
+        const video = videoRef.current;
+        if (!video) return;
+        restartAt.current = video.currentTime;
+        restartPaused.current = video.paused;
+        if (!video.videoWidth) return;
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d')?.drawImage(video, 0, 0);
+            setHeldFrame(canvas.toDataURL('image/jpeg', 0.85));
+        } catch {
+            // A frame from another origin cannot be read back; the switch then shows black for a moment
+        }
+    };
+
     const chooseAudio = (index: number) => {
         setMenuOpen(false);
         const track = source?.audioTracks.find(t => t.index === index);
         if (track) saveTrackPrefs(trackGroup, { audio: toPick(track) });
         if (index === source?.audioStreamIndex) return;
-        restartAt.current = videoRef.current?.currentTime;
+        prepareRestart();
         setAudioIndex(index);
+    };
+
+    const chooseQuality = (key: string) => {
+        setMenuOpen(false);
+        if (key === (quality ? String(quality.height) : 'original')) return;
+        prepareRestart();
+        setQualityKey(key);
     };
 
     // c toggles subtitles: back to the last chosen track, or the first one
@@ -563,6 +599,19 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, ownSeconds, o
 
     const menu = source && (
         <div className='tb-player__menu' role='menu'>
+            {qualitiesFor(source.height ?? fileHeight).length > 0 && (
+                <section className='tb-player__menu-group'>
+                    <h4>Quality</h4>
+                    <button className='tb-player__menu-item' role='menuitemradio' aria-checked={!quality} onClick={() => chooseQuality('original')}>
+                        Original <span className='tb-muted'>{source.height ?? fileHeight}p</span>
+                    </button>
+                    {qualitiesFor(source.height ?? fileHeight).map(q => (
+                        <button key={q.height} className='tb-player__menu-item' role='menuitemradio' aria-checked={quality?.height === q.height} onClick={() => chooseQuality(String(q.height))}>
+                            {q.height}p
+                        </button>
+                    ))}
+                </section>
+            )}
             {source.audioTracks.length > 1 && (
                 <section className='tb-player__menu-group'>
                     <h4>Audio</h4>
@@ -651,7 +700,11 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, ownSeconds, o
                     setIdle(false);
                 }}
                 onWaiting={() => setWaiting(true)}
-                onPlaying={() => setWaiting(false)}
+                onPlaying={() => {
+                    setWaiting(false);
+                    setHeldFrame(undefined);
+                }}
+                onSeeked={() => setHeldFrame(undefined)}
                 onCanPlay={() => setWaiting(false)}
                 onTimeUpdate={onTimeUpdate}
                 onDurationChange={e => {
@@ -665,6 +718,7 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, ownSeconds, o
                 ))}
             </video>
 
+            {heldFrame && <img className='tb-player__held' src={heldFrame} alt='' />}
             {waiting && !error && !touch && <div className='tb-player__spinner' aria-label='Loading' />}
             {error && <div className='tb-player__error'>{error}</div>}
             {prompt && (

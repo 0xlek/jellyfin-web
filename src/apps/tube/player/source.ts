@@ -10,6 +10,22 @@ export type SubtitleTrack = { index: number, label: string, language?: string, s
 
 export type AudioTrack = { index: number, label: string, language?: string };
 
+/** A YouTube-style quality step: the server scales the video down to this height and bitrate. */
+export type Quality = { height: number, bitrate: number };
+
+export const QUALITIES: Quality[] = [
+    { height: 2160, bitrate: 40_000_000 },
+    { height: 1440, bitrate: 16_000_000 },
+    { height: 1080, bitrate: 8_000_000 },
+    { height: 720, bitrate: 4_000_000 },
+    { height: 480, bitrate: 1_500_000 },
+    { height: 360, bitrate: 800_000 },
+    { height: 240, bitrate: 400_000 }
+];
+
+/** The steps worth offering for a file: only ones below its own height, which Original already covers. */
+export const qualitiesFor = (height?: number) => (height ? QUALITIES.filter(q => q.height < height) : []);
+
 export type PlaybackSource = {
     url: string
     isHls: boolean
@@ -20,6 +36,8 @@ export type PlaybackSource = {
     audioTracks: AudioTrack[]
     /** The audio track this stream plays. */
     audioStreamIndex?: number
+    /** The file's own video height. */
+    height?: number
 };
 
 const withApiKey = (api: Api, url: string) => {
@@ -30,13 +48,29 @@ const withApiKey = (api: Api, url: string) => {
 };
 
 /**
+ * Fits a transcoding URL's video into a 16:9 box of this height, replacing the server's own limits. With a height
+ * alone the server scales by its width limit only, so both go in; the aspect ratio is kept inside the box.
+ */
+const withMaxSize = (url: string, height: number) => {
+    const parsed = new URL(url);
+    for (const key of [ ...parsed.searchParams.keys() ]) {
+        if ([ 'maxheight', 'maxwidth' ].includes(key.toLowerCase())) parsed.searchParams.delete(key);
+    }
+    parsed.searchParams.set('MaxWidth', String(Math.round(height * 16 / 9 / 2) * 2));
+    parsed.searchParams.set('MaxHeight', String(height));
+    return parsed.toString();
+};
+
+/**
  * Negotiates a stream with the server using the same device profile as the classic player.
  * Browsers cannot switch the audio track inside a directly played file, so choosing a track
- * asks the server for a stream (remuxed when it can) that carries only that track.
+ * asks the server for a stream (remuxed when it can) that carries only that track. A quality
+ * below the original always transcodes, scaled to that height and bitrate.
  */
-export const getPlaybackSource = async (api: Api, userId: string, item: BaseItemDto, audioStreamIndex?: number): Promise<PlaybackSource> => {
-    const profile: DeviceProfile = getDeviceProfile();
+export const getPlaybackSource = async (api: Api, userId: string, item: BaseItemDto, audioStreamIndex?: number, quality?: Quality): Promise<PlaybackSource> => {
+    const profile: DeviceProfile = { ...getDeviceProfile(), ...(quality && { MaxStreamingBitrate: quality.bitrate }) };
     const switchingAudio = audioStreamIndex !== undefined;
+    const direct = !switchingAudio && !quality;
     const { data } = await getMediaInfoApi(api).getPostedPlaybackInfo({
         itemId: item.Id!,
         userId,
@@ -45,8 +79,9 @@ export const getPlaybackSource = async (api: Api, userId: string, item: BaseItem
             DeviceProfile: profile,
             AutoOpenLiveStream: true,
             AudioStreamIndex: audioStreamIndex,
-            EnableDirectPlay: !switchingAudio,
-            EnableDirectStream: !switchingAudio
+            MaxStreamingBitrate: quality?.bitrate,
+            EnableDirectPlay: direct,
+            EnableDirectStream: direct
         }
     });
 
@@ -56,7 +91,7 @@ export const getPlaybackSource = async (api: Api, userId: string, item: BaseItem
 
     let url: string;
     let playMethod: PlayMethod;
-    if (!switchingAudio && (source.SupportsDirectPlay || source.SupportsDirectStream)) {
+    if (direct && (source.SupportsDirectPlay || source.SupportsDirectStream)) {
         playMethod = source.SupportsDirectPlay ? PlayMethod.DirectPlay : PlayMethod.DirectStream;
         url = api.getUri(`/Videos/${item.Id}/stream.${source.Container}`, {
             Static: true,
@@ -69,6 +104,7 @@ export const getPlaybackSource = async (api: Api, userId: string, item: BaseItem
     } else if (source.TranscodingUrl) {
         playMethod = PlayMethod.Transcode;
         url = withApiKey(api, source.TranscodingUrl);
+        if (quality) url = withMaxSize(url, quality.height);
     } else {
         throw new Error('Server offered no way to play this item');
     }
@@ -91,8 +127,11 @@ export const getPlaybackSource = async (api: Api, userId: string, item: BaseItem
             language: s.Language ?? undefined
         }));
 
+    const video = source.MediaStreams?.find(s => s.Type === 'Video');
+
     return {
         url,
+        height: video?.Height ?? undefined,
         audioTracks,
         audioStreamIndex: audioStreamIndex ?? source.DefaultAudioStreamIndex ?? audioTracks[0]?.index,
         isHls: source.TranscodingSubProtocol === 'hls' || url.includes('.m3u8'),
