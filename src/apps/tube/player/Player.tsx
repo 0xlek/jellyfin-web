@@ -182,8 +182,12 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, ownSeconds, o
         document.addEventListener('visibilitychange', onVisibility);
         window.addEventListener('pagehide', onPageHide);
 
-        const start = () => {
-            if (from) video.currentTime = from;
+        // An iPhone loads nothing, metadata included, until play is called; so play right away and seek to the
+        // resume point once the metadata is in. When autoplay is refused the play button waits for a tap instead.
+        const seekToStart = () => {
+            if (from && Math.abs(video.currentTime - from) > 1) video.currentTime = from;
+        };
+        const begin = () => {
             if (restartPaused.current) {
                 restartPaused.current = false;
                 setWaiting(false);
@@ -203,7 +207,7 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, ownSeconds, o
                 current = result;
                 setSource(result);
                 if (audioIndex === undefined) setSubtitle(initialSubtitle(result.subtitles, prefs));
-                video.addEventListener('loadedmetadata', start, { once: true });
+                video.addEventListener('loadedmetadata', seekToStart, { once: true });
 
                 if (result.isHls && shouldUseHlsJs()) {
                     const { default: HlsJs } = await import(/* webpackChunkName: "hlsjs" */ 'hls.js');
@@ -217,6 +221,7 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, ownSeconds, o
                 } else {
                     video.src = result.url;
                 }
+                begin();
             })
             .catch((err: Error) => {
                 if (!cancelled) setError(err.message);
@@ -228,7 +233,7 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, ownSeconds, o
             video.removeEventListener('playing', onPlaying);
             video.removeEventListener('pause', reportProgress);
             video.removeEventListener('seeked', reportProgress);
-            video.removeEventListener('loadedmetadata', start);
+            video.removeEventListener('loadedmetadata', seekToStart);
             document.removeEventListener('visibilitychange', onVisibility);
             window.removeEventListener('pagehide', onPageHide);
             if (started) {

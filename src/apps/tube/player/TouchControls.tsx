@@ -49,7 +49,8 @@ const TouchControls: FC<TouchControlsProps> = ({
             <button className='tb-ctl tb-touch__skip' aria-label='Previous' disabled={!onPrevious} onClick={onPrevious}>
                 <Icon name='previous' filled />
             </button>
-            {waiting ?
+            {/* Only while playback is under way; a stalled load that never started keeps the play button tappable */}
+            {waiting && playing ?
                 <span className='tb-touch__play tb-player__spinner' aria-label='Loading' /> :
                 <button className='tb-ctl tb-touch__play' aria-label={playing ? 'Pause' : 'Play'} onClick={onTogglePlay}>
                     <Icon name={playing ? 'pause' : 'play'} filled />

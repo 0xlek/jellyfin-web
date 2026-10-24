@@ -1795,10 +1795,10 @@ html {
     height: 2px;
     background: var(--tb-accent);
     pointer-events: none;
+}
 
-    .tb-touch.is-visible & {
-        opacity: 0;
-    }
+.tb-player .tb-touch.is-visible .tb-touch__line {
+    opacity: 0;
 }
 
 /* Player settings as a bottom sheet */
