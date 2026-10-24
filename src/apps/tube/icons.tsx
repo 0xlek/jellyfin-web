@@ -23,6 +23,7 @@ const PATHS = {
     play: 'M7 4l13 8-13 8z',
     pause: 'M7 4h4v16H7zM14 4h4v16h-4z',
     next: 'M5 4l11 8-11 8zM18 4v16',
+    previous: 'M19 4L8 12l11 8zM6 4v16',
     volume: 'M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11',
     mute: 'M4 9h4l5-4v14l-5-4H4zM16 9l5 6M21 9l-5 6',
     cc: 'M3 6h18v12H3zM10 10.5a2 2 0 1 0 0 3M17 10.5a2 2 0 1 0 0 3',

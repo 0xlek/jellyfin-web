@@ -1,18 +1,18 @@
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
 import { BaseItemKind } from '@jellyfin/sdk/lib/generated-client/models/base-item-kind';
 import classNames from 'classnames';
-import React, { type FC, useCallback, useEffect, useRef, useState } from 'react';
+import React, { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 
 import Page from 'components/Page';
 import { useApi } from 'hooks/useApi';
 import globalize from 'lib/globalize';
 
-import { type CollectionInfo, useCollectionOf, useCollectionVideos, useItem, useToggleFavorite, useTogglePlayed, useUpNext } from '../api';
+import { type CollectionInfo, useCollectionOf, useCollectionVideos, useItem, useItemWatchSessions, useToggleFavorite, useTogglePlayed, useUpNext, type WatchSession } from '../api';
 import VideoCard from '../components/VideoCard';
 import { useDocumentTitle, useStoredState } from '../hooks';
 import Icon from '../icons';
-import Player from '../player/Player';
+import Player, { type ResumeChoice } from '../player/Player';
 import { avatarUrl, episodeLabel, formatRuntime, itemLink, ticksToSeconds } from '../utils';
 
 const Description: FC<{ item: BaseItemDto }> = ({ item }) => {
@@ -108,9 +108,59 @@ const Channel: FC<{ item: BaseItemDto }> = ({ item }) => {
     );
 };
 
+/** The latest open session of every other device, for the "continue from" switch. */
+const otherDevices = (sessions: WatchSession[], deviceId?: string): ResumeChoice[] => {
+    const latest = new Map<string, WatchSession>();
+    for (const s of sessions) {
+        if (s.DeviceId !== deviceId && !s.IsFinished && s.PositionTicks > 0 && !latest.has(s.DeviceId)) latest.set(s.DeviceId, s);
+    }
+    return [ ...latest.values() ].map(s => ({
+        key: s.Id,
+        label: s.DeviceName || s.Client || 'Another device',
+        seconds: ticksToSeconds(s.PositionTicks),
+        when: s.DateLastPlayed
+    }));
+};
+
+/** Each device resumes its own session; a server without sessions has one resume point for all. */
+const useResume = (id?: string, item?: BaseItemDto) => {
+    const { api } = useApi();
+    const { data: sessions, isFetchedAfterMount, isError } = useItemWatchSessions(id);
+    // The persisted cache may hold sessions from before this device last played; wait for fresh ones
+    const findingSessions = !isFetchedAfterMount && !isError;
+    const deviceId = api?.deviceInfo.id;
+    const ownTicks = sessions ?
+        sessions.find(s => s.DeviceId === deviceId && !s.IsFinished)?.PositionTicks :
+        item?.UserData?.PlaybackPositionTicks;
+    const others = useMemo(() => otherDevices(sessions ?? [], deviceId), [ sessions, deviceId ]);
+    return { findingSessions, ownSeconds: ownTicks ? ticksToSeconds(ownTicks) : undefined, others };
+};
+
+/** A folder video's track choices belong to its folder, so wait for it unless the link names it. */
+const trackGroupOf = (item: BaseItemDto | undefined, listId: string | null | undefined, findingCollection: boolean) => {
+    if (item?.SeriesId) return item.SeriesId;
+    if (listId) return listId;
+    return findingCollection && item?.Type === BaseItemKind.Video ? undefined : item?.Id;
+};
+
+/** The videos either side of this one: its playlist's, or the up next rail's next one. */
+const useNeighbours = (id?: string, listId?: string | null, playlist?: BaseItemDto[], upNext?: BaseItemDto[]) => {
+    const navigate = useNavigate();
+    const position = playlist?.findIndex(v => v.Id === id) ?? -1;
+    const next = playlist ? playlist[position + 1] : upNext?.[0];
+    const previous = playlist && position > 0 ? playlist[position - 1] : undefined;
+    const linkTo = useCallback((video: BaseItemDto) => (playlist ? `/watch?v=${video.Id}&list=${listId}` : itemLink(video)), [ playlist, listId ]);
+    const goNext = useCallback(() => {
+        if (next) navigate(linkTo(next));
+    }, [ next, navigate, linkTo ]);
+    const goPrevious = useCallback(() => {
+        if (previous) navigate(linkTo(previous));
+    }, [ previous, navigate, linkTo ]);
+    return { position, next, previous, linkTo, goNext, goPrevious };
+};
+
 const Watch: FC = () => {
     const [ params ] = useSearchParams();
-    const navigate = useNavigate();
     const id = params.get('v') ?? undefined;
     const t = Number(params.get('t')) || undefined;
     const { data: item, error } = useItem(id);
@@ -124,19 +174,9 @@ const Watch: FC = () => {
 
     useDocumentTitle(item?.Type === BaseItemKind.Episode ? `${item.Name} · ${item.SeriesName}` : item?.Name);
 
-    // Resume where the server says we left off, unless the URL pins a time
-    const resumeAt = t ?? (item?.UserData?.PlaybackPositionTicks ? ticksToSeconds(item.UserData.PlaybackPositionTicks) : undefined);
-    const position = playlist?.findIndex(v => v.Id === id) ?? -1;
-    const next = playlist ? playlist[position + 1] : upNext?.[0];
-    const linkTo = useCallback((video: BaseItemDto) => (playlist ? `/watch?v=${video.Id}&list=${listId}` : itemLink(video)), [ playlist, listId ]);
-
-    const goNext = useCallback(() => {
-        if (next) navigate(linkTo(next));
-    }, [ next, navigate, linkTo ]);
-
-    const onEnded = useCallback(() => {
-        if (autoplay === 'true') goNext();
-    }, [ autoplay, goNext ]);
+    const { findingSessions, ownSeconds, others } = useResume(id, item);
+    const resumeAt = t ?? ownSeconds;
+    const { position, next, previous, linkTo, goNext, goPrevious } = useNeighbours(id, listId, playlist, upNext);
 
     const toggleTheater = useCallback(() => setTheater(v => (v === 'true' ? 'false' : 'true')), [ setTheater ]);
 
@@ -151,8 +191,7 @@ const Watch: FC = () => {
     if (!id) return <Navigate replace to='/home' />;
 
     const isTheater = theater === 'true';
-    // A folder video's track choices belong to its folder, so wait for it unless the link names it
-    const trackGroup = item?.SeriesId ?? listId ?? (findingCollection && item?.Type === BaseItemKind.Video ? undefined : item?.Id);
+    const trackGroup = trackGroupOf(item, listId, findingCollection);
 
     // One grid: theater mode only changes the grid areas, so the player never remounts mid-stream
 
@@ -160,17 +199,24 @@ const Watch: FC = () => {
         <Page id='tubeWatch' className={classNames('tb-page tb-watch', { 'is-theater': isTheater })} isNowPlayingBarEnabled={false}>
             <div className='tb-watch__layout'>
                 <div className='tb-watch__frame'>
-                    {item && trackGroup && (
+                    {item?.Id === id && trackGroup && !findingSessions ? (
                         <Player
                             key={item.Id}
                             item={item}
                             trackGroup={trackGroup}
                             startSeconds={resumeAt}
+                            ownSeconds={ownSeconds}
+                            otherDevices={others}
                             theater={isTheater}
                             onToggleTheater={toggleTheater}
-                            onEnded={onEnded}
+                            next={next}
+                            autoplay={autoplay === 'true'}
+                            onPrevious={previous ? goPrevious : undefined}
                             onNext={next ? goNext : undefined}
                         />
+                    ) : (
+                        // Holds the player's size while the next video loads, so the page below does not jump
+                        <div className='tb-player' aria-hidden='true' />
                     )}
                 </div>
                 <div className='tb-watch__primary'>

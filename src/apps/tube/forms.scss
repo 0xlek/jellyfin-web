@@ -465,6 +465,67 @@
         font-size: 13px;
     }
 
+    /* Watch sessions */
+
+    .tb-wsession-group {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--tb-border);
+
+        ul {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+    }
+
+    .tb-wsession-group__title {
+        font-weight: 600;
+    }
+
+    .tb-wsession-group__link {
+        color: inherit;
+    }
+
+    .tb-wsession {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px 16px;
+        padding: 10px 0 0;
+    }
+
+    .tb-wsession__text {
+        display: flex;
+        flex: 1 1 220px;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+    }
+
+    .tb-wsession__bar {
+        max-width: 240px;
+        height: 3px;
+        background: var(--tb-border);
+
+        span {
+            display: block;
+            height: 100%;
+            background: var(--tb-accent);
+        }
+    }
+
+    .tb-wsession__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .tb-wsession__time {
+        width: 110px;
+        height: 34px;
+    }
+
     .tb-setting__control {
         flex-shrink: 0;
         width: min(260px, 45%);

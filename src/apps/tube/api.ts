@@ -1,3 +1,4 @@
+import type { Api } from '@jellyfin/sdk';
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
 import { BaseItemKind } from '@jellyfin/sdk/lib/generated-client/models/base-item-kind';
 import { ItemFields } from '@jellyfin/sdk/lib/generated-client/models/item-fields';
@@ -367,4 +368,76 @@ export const useServerName = () => {
         enabled: !!server
     });
     return data;
+};
+
+/** One device's progress through an item. Playback only moves it forward; the settings page can move it anywhere. */
+export type WatchSession = {
+    Id: string
+    ItemId: string
+    DeviceId: string
+    DeviceName?: string | null
+    Client?: string | null
+    PositionTicks: number
+    IsFinished: boolean
+    DateCreated: string
+    DateLastPlayed: string
+};
+
+const WATCH_SESSIONS_KEY = [ TUBE_KEY, 'WatchSessions' ];
+
+const watchSessionsRequest = (api: Api, path = '') => ({
+    url: `${api.basePath}/WatchSessions${path}`,
+    headers: { Authorization: api.authorizationHeader }
+});
+
+const getWatchSessions = async (api: Api, params: { itemId?: string, limit?: number }, signal?: AbortSignal) => {
+    const { url, headers } = watchSessionsRequest(api);
+    return (await api.axiosInstance.get<WatchSession[]>(url, { params, headers, signal })).data;
+};
+
+/** Every device's sessions of one item, most recently played first. Errors on a server without the sessions API. */
+export const useItemWatchSessions = (itemId?: string) => {
+    const { api, user } = useApi();
+    return useQuery({
+        queryKey: [ ...WATCH_SESSIONS_KEY, user?.Id, itemId ],
+        queryFn: ({ signal }) => getWatchSessions(api!, { itemId }, signal),
+        enabled: !!api && !!user?.Id && !!itemId,
+        // Other devices move these at any time
+        staleTime: 0,
+        retry: false
+    });
+};
+
+export const useAllWatchSessions = () => {
+    const { api, user } = useApi();
+    return useQuery({
+        queryKey: [ ...WATCH_SESSIONS_KEY, user?.Id, 'all' ],
+        queryFn: ({ signal }) => getWatchSessions(api!, { limit: 500 }, signal),
+        enabled: !!api && !!user?.Id,
+        staleTime: 0
+    });
+};
+
+export const useSetWatchSessionPosition = () => {
+    const { api } = useApi();
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ id, positionTicks }: { id: string, positionTicks: number }) => {
+            const { url, headers } = watchSessionsRequest(api!, `/${id}/Position`);
+            return (await api!.axiosInstance.post<WatchSession>(url, undefined, { params: { positionTicks }, headers })).data;
+        },
+        onSettled: () => queryClient.invalidateQueries({ queryKey: WATCH_SESSIONS_KEY })
+    });
+};
+
+export const useDeleteWatchSession = () => {
+    const { api } = useApi();
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (id: string) => {
+            const { url, headers } = watchSessionsRequest(api!, `/${id}`);
+            await api!.axiosInstance.delete(url, { headers });
+        },
+        onSettled: () => queryClient.invalidateQueries({ queryKey: WATCH_SESSIONS_KEY })
+    });
 };

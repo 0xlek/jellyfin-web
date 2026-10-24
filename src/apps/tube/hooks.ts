@@ -96,3 +96,16 @@ export const useIdle = () => {
     useEffect(() => whenIdle(() => setIdle(true)), []);
     return idle;
 };
+
+/** Whether a media query matches, following changes (a tablet docking a mouse, say). */
+export const useMediaQuery = (query: string) => {
+    const [ matches, setMatches ] = useState(() => window.matchMedia(query).matches);
+    useEffect(() => {
+        const list = window.matchMedia(query);
+        const onChange = () => setMatches(list.matches);
+        onChange();
+        list.addEventListener('change', onChange);
+        return () => list.removeEventListener('change', onChange);
+    }, [ query ]);
+    return matches;
+};

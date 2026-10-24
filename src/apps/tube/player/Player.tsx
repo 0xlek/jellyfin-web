@@ -5,21 +5,27 @@ import classNames from 'classnames';
 import type Hls from 'hls.js';
 
 import { shouldUseHlsJs } from 'utils/deviceProfile';
+import { formatDistanceToNowStrict } from 'date-fns';
 import Screenfull from 'screenfull';
+import { createPortal } from 'react-dom';
 import React, { type FC, type PointerEvent as ReactPointerEvent, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 
 import { useApi } from 'hooks/useApi';
 import globalize from 'lib/globalize';
 
 import { TUBE_KEY } from '../api';
-import { isTyping, useDismiss, useStoredState } from '../hooks';
+import { isTyping, useDismiss, useMediaQuery, useStoredState } from '../hooks';
 import Icon from '../icons';
-import { formatClock, secondsToTicks, ticksToSeconds } from '../utils';
+import { channelName, formatClock, secondsToTicks, thumbUrl, ticksToSeconds } from '../utils';
 import { getPlaybackSource, type PlaybackSource, type SubtitleTrack } from './source';
 import { loadTrackPrefs, matchTrack, saveTrackPrefs, toPick, type TrackPrefs } from './tracks';
+import TouchControls from './TouchControls';
 import { getTrickplay, previewCell } from './trickplay';
 
-const PROGRESS_INTERVAL_MS = 10_000;
+// Every report lands in this device's watch session, so a crash or a closed tab loses at most this much
+const PROGRESS_INTERVAL_MS = 5000;
+const NEXT_COUNTDOWN_S = 8;
+const RESUME_PROMPT_MS = 12_000;
 const IDLE_HIDE_MS = 2500;
 const DOUBLE_TAP_MS = 300;
 const FLASH_MS = 600;
@@ -36,20 +42,42 @@ const initialSubtitle = (tracks: SubtitleTrack[], prefs: TrackPrefs) => {
 // eslint-disable-next-line compat/compat
 const canPip = typeof document !== 'undefined' && document.pictureInPictureEnabled === true;
 
+export type ResumeChoice = {
+    key: string
+    label: string
+    seconds: number
+    when: string
+};
+
 type PlayerProps = {
     item: BaseItemDto
     /** Audio and subtitle choices carry over between videos of this group (show or folder). */
     trackGroup: string
     startSeconds?: number
+    /** Where this device's own session stands, if it has one. */
+    ownSeconds?: number
+    /** Where other devices left off; playing here continues this device's own session. */
+    otherDevices: ResumeChoice[]
     theater: boolean
     onToggleTheater: () => void
-    onEnded: () => void
+    next?: BaseItemDto
+    /** Counts down to the next video when this one ends. */
+    autoplay: boolean
+    onPrevious?: () => void
     onNext?: () => void
 };
 
-const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onToggleTheater, onEnded, onNext }) => {
+type WebkitVideo = HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+
+const ago = (date: string) => formatDistanceToNowStrict(new Date(date), { addSuffix: true });
+
+// One component owns the media element and every control bound to it; splitting it would only pass its state around
+// eslint-disable-next-line sonarjs/cognitive-complexity
+const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, ownSeconds, otherDevices, theater, onToggleTheater, next, autoplay, onPrevious, onNext }) => {
     const { api, user } = useApi();
     const queryClient = useQueryClient();
+    // Touch screens get YouTube's mobile controls whatever their width; a mouse gets the desktop ones
+    const touch = useMediaQuery('(hover: none) and (pointer: coarse)');
     const rootRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const barRef = useRef<HTMLDivElement>(null);
@@ -116,8 +144,24 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onTo
             PlayMethod: current?.playMethod,
             CanSeek: true
         });
+        const stopInfo = () => ({ ItemId: item.Id!, MediaSourceId: current?.mediaSourceId, PlaySessionId: current?.playSessionId, PositionTicks: secondsToTicks(video.currentTime) });
         const reportProgress = () => {
             if (started) void sessions.reportPlaybackProgress({ playbackProgressInfo: info() }).catch(() => undefined);
+        };
+        // A hidden or closing page may never run another timer; keepalive lets the request outlive it
+        const sendNow = (path: string, body: object) => {
+            void fetch(`${api.basePath}${path}`, {
+                method: 'POST',
+                keepalive: true,
+                headers: { 'Content-Type': 'application/json', Authorization: api.authorizationHeader },
+                body: JSON.stringify(body)
+            }).catch(() => undefined);
+        };
+        const onVisibility = () => {
+            if (started && document.visibilityState === 'hidden') sendNow('/Sessions/Playing/Progress', info());
+        };
+        const onPageHide = () => {
+            if (started) sendNow('/Sessions/Playing/Stopped', stopInfo());
         };
         const onPlaying = () => {
             if (started) return reportProgress();
@@ -128,6 +172,8 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onTo
         video.addEventListener('playing', onPlaying);
         video.addEventListener('pause', reportProgress);
         video.addEventListener('seeked', reportProgress);
+        document.addEventListener('visibilitychange', onVisibility);
+        window.addEventListener('pagehide', onPageHide);
 
         const start = () => {
             if (from) video.currentTime = from;
@@ -171,9 +217,10 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onTo
             video.removeEventListener('pause', reportProgress);
             video.removeEventListener('seeked', reportProgress);
             video.removeEventListener('loadedmetadata', start);
+            document.removeEventListener('visibilitychange', onVisibility);
+            window.removeEventListener('pagehide', onPageHide);
             if (started) {
-                const stopInfo = { ItemId: item.Id!, MediaSourceId: current?.mediaSourceId, PlaySessionId: current?.playSessionId, PositionTicks: secondsToTicks(video.currentTime) };
-                void sessions.reportPlaybackStopped({ playbackStopInfo: stopInfo })
+                void sessions.reportPlaybackStopped({ playbackStopInfo: stopInfo() })
                     .catch(() => undefined)
                     .finally(() => queryClient.invalidateQueries({ queryKey: [ TUBE_KEY ] }));
             }
@@ -222,6 +269,32 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onTo
         };
     }, []);
 
+    // Up next: counts down once the video ends; playing again or Cancel stops it
+    const [ countdown, setCountdown ] = useState<number>();
+    const onNextRef = useRef(onNext);
+    onNextRef.current = onNext;
+    useEffect(() => {
+        if (countdown === undefined) return;
+        if (countdown <= 0) {
+            onNextRef.current?.();
+            return;
+        }
+        const timer = window.setTimeout(() => setCountdown(c => (c === undefined ? c : c - 1)), 1000);
+        return () => window.clearTimeout(timer);
+    }, [ countdown ]);
+    const onEnded = () => {
+        if (autoplay && next && onNext) setCountdown(NEXT_COUNTDOWN_S);
+    };
+
+    // Offer the most recent other device's position for a while after playback starts here
+    const [ promptOpen, setPromptOpen ] = useState(true);
+    const prompt = promptOpen ? otherDevices.find(d => Math.abs(d.seconds - (startSeconds ?? 0)) > 5) : undefined;
+    useEffect(() => {
+        if (!playing || !promptOpen) return;
+        const timer = window.setTimeout(() => setPromptOpen(false), RESUME_PROMPT_MS);
+        return () => window.clearTimeout(timer);
+    }, [ playing, promptOpen ]);
+
     const showFlash = useCallback((text: string, side = 0) => {
         setFlash({ text, side, key: Date.now() });
         window.clearTimeout(flashTimer.current);
@@ -253,9 +326,9 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onTo
 
     const stepSpeed = useCallback((direction: number) => {
         const at = SPEEDS.indexOf(Number(speed));
-        const next = SPEEDS[Math.min(Math.max((at < 0 ? SPEEDS.indexOf(1) : at) + direction, 0), SPEEDS.length - 1)];
-        setSpeed(String(next));
-        showFlash(`${next}x`);
+        const rate = SPEEDS[Math.min(Math.max((at < 0 ? SPEEDS.indexOf(1) : at) + direction, 0), SPEEDS.length - 1)];
+        setSpeed(String(rate));
+        showFlash(`${rate}x`);
     }, [ speed, setSpeed, showFlash ]);
 
     const togglePip = useCallback(() => {
@@ -290,8 +363,16 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onTo
         setTime(seconds);
     }, []);
 
+    const resumeFrom = (seconds: number) => {
+        setPromptOpen(false);
+        setMenuOpen(false);
+        seekTo(seconds);
+        void videoRef.current?.play().catch(() => undefined);
+    };
+
     const toggleFullscreen = useCallback(() => {
         if (Screenfull.isEnabled && rootRef.current) void Screenfull.toggle(rootRef.current);
+        else (videoRef.current as WebkitVideo | null)?.webkitEnterFullscreen?.();
     }, []);
 
     const toggleMute = useCallback(() => setMuted(m => (m === 'true' ? 'false' : 'true')), [ setMuted ]);
@@ -299,7 +380,9 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onTo
     const wake = useCallback(() => {
         setIdle(false);
         window.clearTimeout(idleTimer.current);
-        idleTimer.current = window.setTimeout(() => setIdle(true), IDLE_HIDE_MS);
+        idleTimer.current = window.setTimeout(() => {
+            if (videoRef.current && !videoRef.current.paused) setIdle(true);
+        }, IDLE_HIDE_MS);
     }, []);
 
     useEffect(() => () => window.clearTimeout(idleTimer.current), []);
@@ -375,7 +458,8 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onTo
         if (video.buffered.length) setBuffered(video.buffered.end(video.buffered.length - 1));
     };
 
-    const showControls = !playing || !idle || scrubbing || menuOpen;
+    // Touch controls can be tapped away even when paused; desktop ones stay up until playback runs
+    const showControls = (touch ? !idle : !playing || !idle) || scrubbing || menuOpen;
 
     const trickplay = useMemo(() => getTrickplay(api, item, source?.mediaSourceId), [ api, item, source?.mediaSourceId ]);
     // A few tiles cover a whole episode; fetching them all on first hover keeps scrubbing off the network
@@ -409,9 +493,9 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onTo
     const lastTap = useRef<{ at: number, side: number }>();
     const tapTimer = useRef<number>();
     useEffect(() => () => window.clearTimeout(tapTimer.current), []);
-    const onVideoPointerUp = (e: ReactPointerEvent<HTMLVideoElement>) => {
+    const onSurfacePointerUp = (e: ReactPointerEvent<HTMLElement>) => {
         pointerType.current = e.pointerType;
-        if (e.pointerType !== 'touch') return;
+        if (e.pointerType !== 'touch' || (e.target as HTMLElement).closest('button, .tb-scrubber')) return;
         const rect = e.currentTarget.getBoundingClientRect();
         const x = (e.clientX - rect.left) / rect.width;
         let side = 0;
@@ -428,21 +512,125 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onTo
         }
         const controlsUp = showControls;
         tapTimer.current = window.setTimeout(() => {
-            if (controlsUp) togglePlay();
-            wake();
+            if (!touch) {
+                if (controlsUp) togglePlay();
+                wake();
+            } else if (controlsUp) {
+                window.clearTimeout(idleTimer.current);
+                setIdle(true);
+            } else {
+                wake();
+            }
         }, side ? DOUBLE_TAP_MS : 0);
     };
 
     const isMuted = muted === 'true' || Number(volume) === 0;
     const played = duration ? (time / duration) * 100 : 0;
 
+    const scrubber = (
+        <div
+            ref={barRef}
+            className={classNames('tb-scrubber', { 'is-scrubbing': scrubbing })}
+            role='slider'
+            aria-label='Seek'
+            aria-valuemin={0}
+            aria-valuemax={Math.round(duration)}
+            aria-valuenow={Math.round(time)}
+            onPointerDown={onBarPointerDown}
+            onPointerMove={onBarPointerMove}
+            onPointerUp={onBarPointerUp}
+            onPointerEnter={preloadPreviews}
+            onPointerLeave={() => setHover(undefined)}
+        >
+            <div className='tb-scrubber__track'>
+                <span className='tb-scrubber__buffered' style={{ width: `${duration ? (buffered / duration) * 100 : 0}%` }} />
+                {hover !== undefined && <span className='tb-scrubber__hover' style={{ width: `${(hover / duration) * 100}%` }} />}
+                <span className='tb-scrubber__played' style={{ width: `${played}%` }} />
+            </div>
+            <span className='tb-scrubber__thumb' style={{ left: `${played}%` }} />
+            {hover !== undefined && (
+                <span
+                    className='tb-scrubber__tooltip'
+                    // Keep a preview inside the player at both ends of the bar
+                    style={{ left: `clamp(${trickplay ? PREVIEW_WIDTH / 2 : 0}px, ${(hover / duration) * 100}%, calc(100% - ${trickplay ? PREVIEW_WIDTH / 2 : 0}px))` }}
+                >
+                    {renderPreview(hover)}
+                    <span className='tb-scrubber__time'>{formatClock(hover)}</span>
+                </span>
+            )}
+        </div>
+    );
+
+    const menu = source && (
+        <div className='tb-player__menu' role='menu'>
+            {source.audioTracks.length > 1 && (
+                <section className='tb-player__menu-group'>
+                    <h4>Audio</h4>
+                    {source.audioTracks.map(track => (
+                        <button
+                            key={track.index}
+                            className='tb-player__menu-item'
+                            role='menuitemradio'
+                            aria-checked={track.index === source.audioStreamIndex}
+                            onClick={() => chooseAudio(track.index)}
+                        >
+                            {track.label}
+                        </button>
+                    ))}
+                </section>
+            )}
+            {source.subtitles.length > 0 && (
+                <section className='tb-player__menu-group'>
+                    <h4>{globalize.translate('Subtitles')}</h4>
+                    <button className='tb-player__menu-item' role='menuitemradio' aria-checked={subtitle < 0} onClick={() => pickSubtitle(-1)}>Off</button>
+                    {source.subtitles.map((track, i) => (
+                        <button key={track.index} className='tb-player__menu-item' role='menuitemradio' aria-checked={subtitle === i} onClick={() => pickSubtitle(i)}>
+                            {track.label}
+                        </button>
+                    ))}
+                </section>
+            )}
+            <section className='tb-player__menu-group'>
+                <h4>Resume from</h4>
+                <button className='tb-player__menu-item' role='menuitem' onClick={() => resumeFrom(0)}>Beginning</button>
+                {!!ownSeconds && (
+                    <button className='tb-player__menu-item' role='menuitem' onClick={() => resumeFrom(ownSeconds)}>
+                        This device · {formatClock(ownSeconds)}
+                    </button>
+                )}
+                {otherDevices.map(d => (
+                    <button key={d.key} className='tb-player__menu-item' role='menuitem' onClick={() => resumeFrom(d.seconds)}>
+                        {d.label} · {formatClock(d.seconds)} <span className='tb-muted'>{ago(d.when)}</span>
+                    </button>
+                ))}
+            </section>
+            <section className='tb-player__menu-group'>
+                <h4>Speed</h4>
+                <div className='tb-player__speeds'>
+                    {SPEEDS.map(rate => (
+                        <button
+                            key={rate}
+                            className='tb-player__menu-item'
+                            role='menuitemradio'
+                            aria-checked={Number(speed) === rate}
+                            onClick={() => setSpeed(String(rate))}
+                        >
+                            {rate === 1 ? 'Normal' : `${rate}x`}
+                        </button>
+                    ))}
+                </div>
+            </section>
+        </div>
+    );
+
     return (
         <div
             ref={rootRef}
-            className={classNames('tb-player', { 'is-idle': !showControls, 'is-fullscreen': fullscreen })}
+            className={classNames('tb-player', { 'is-idle': !showControls, 'is-fullscreen': fullscreen, 'is-touch': touch })}
             tabIndex={-1}
-            onPointerMove={wake}
-            onPointerLeave={() => playing && setIdle(true)}
+            // A finger "leaves" on every lift; only a mouse shows the controls by moving and hides them by leaving
+            onPointerMove={e => e.pointerType !== 'touch' && wake()}
+            onPointerLeave={e => e.pointerType !== 'touch' && playing && setIdle(true)}
         >
             {/* Captions come from the server as <track> children when the item has text subtitles */}
             {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
@@ -451,11 +639,17 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onTo
                 className='tb-player__video'
                 playsInline
                 crossOrigin='anonymous'
-                onPointerUp={onVideoPointerUp}
+                onPointerUp={onSurfacePointerUp}
                 onClick={() => pointerType.current !== 'touch' && togglePlay()}
                 onDoubleClick={() => pointerType.current !== 'touch' && toggleFullscreen()}
-                onPlay={() => setPlaying(true)}
-                onPause={() => setPlaying(false)}
+                onPlay={() => {
+                    setPlaying(true);
+                    setCountdown(undefined);
+                }}
+                onPause={() => {
+                    setPlaying(false);
+                    setIdle(false);
+                }}
                 onWaiting={() => setWaiting(true)}
                 onPlaying={() => setWaiting(false)}
                 onCanPlay={() => setWaiting(false)}
@@ -471,163 +665,151 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, theater, onTo
                 ))}
             </video>
 
-            {waiting && !error && <div className='tb-player__spinner' aria-label='Loading' />}
+            {waiting && !error && !touch && <div className='tb-player__spinner' aria-label='Loading' />}
             {error && <div className='tb-player__error'>{error}</div>}
+            {prompt && (
+                <div className='tb-player__resume'>
+                    <button className='tb-player__resume-go' onClick={() => resumeFrom(prompt.seconds)}>
+                        Continue from {prompt.label} at {formatClock(prompt.seconds)}
+                    </button>
+                    <button className='tb-ctl' aria-label='Dismiss' onClick={() => setPromptOpen(false)}>
+                        <Icon name='close' />
+                    </button>
+                </div>
+            )}
+            {countdown !== undefined && next && (
+                <div className='tb-endcard' role='dialog' aria-label='Up next'>
+                    <div className='tb-endcard__label'>Up next in {countdown}</div>
+                    <div className='tb-endcard__video'>
+                        <img src={thumbUrl(api, next, 480)} alt='' />
+                        <div>
+                            <strong>{next.Name}</strong>
+                            <span className='tb-muted'>{channelName(next)}</span>
+                        </div>
+                    </div>
+                    <div className='tb-endcard__actions'>
+                        <button className='tb-pill' onClick={() => setCountdown(undefined)}>{globalize.translate('ButtonCancel')}</button>
+                        <button className='tb-pill tb-pill--primary' onClick={() => onNext?.()}>Play now</button>
+                    </div>
+                </div>
+            )}
             {flash && (
                 <div key={flash.key} className={classNames('tb-player__flash', { 'is-back': flash.side < 0, 'is-forward': flash.side > 0 })}>
                     {flash.text}
                 </div>
             )}
 
-            <div className='tb-player__chrome'>
-                <div
-                    ref={barRef}
-                    className={classNames('tb-scrubber', { 'is-scrubbing': scrubbing })}
-                    role='slider'
-                    aria-label='Seek'
-                    aria-valuemin={0}
-                    aria-valuemax={Math.round(duration)}
-                    aria-valuenow={Math.round(time)}
-                    onPointerDown={onBarPointerDown}
-                    onPointerMove={onBarPointerMove}
-                    onPointerUp={onBarPointerUp}
-                    onPointerEnter={preloadPreviews}
-                    onPointerLeave={() => setHover(undefined)}
-                >
-                    <div className='tb-scrubber__track'>
-                        <span className='tb-scrubber__buffered' style={{ width: `${duration ? (buffered / duration) * 100 : 0}%` }} />
-                        {hover !== undefined && <span className='tb-scrubber__hover' style={{ width: `${(hover / duration) * 100}%` }} />}
-                        <span className='tb-scrubber__played' style={{ width: `${played}%` }} />
-                    </div>
-                    <span className='tb-scrubber__thumb' style={{ left: `${played}%` }} />
-                    {hover !== undefined && (
-                        <span
-                            className='tb-scrubber__tooltip'
-                            // Keep a preview inside the player at both ends of the bar
-                            style={{ left: `clamp(${trickplay ? PREVIEW_WIDTH / 2 : 0}px, ${(hover / duration) * 100}%, calc(100% - ${trickplay ? PREVIEW_WIDTH / 2 : 0}px))` }}
-                        >
-                            {renderPreview(hover)}
-                            <span className='tb-scrubber__time'>{formatClock(hover)}</span>
-                        </span>
+            {touch ? (
+                <>
+                    <TouchControls
+                        visible={showControls && countdown === undefined}
+                        playing={playing}
+                        waiting={waiting && !error}
+                        time={time}
+                        duration={duration}
+                        scrubber={scrubber}
+                        fullscreen={fullscreen}
+                        hasSubtitles={!!source?.subtitles.length}
+                        subtitlesOn={subtitle >= 0}
+                        onSurfaceTap={onSurfacePointerUp}
+                        onTogglePlay={() => {
+                            togglePlay();
+                            wake();
+                        }}
+                        onPrevious={onPrevious}
+                        onNext={onNext}
+                        onToggleSubtitles={() => {
+                            toggleSubtitles();
+                            wake();
+                        }}
+                        onOpenMenu={() => setMenuOpen(true)}
+                        onToggleFullscreen={toggleFullscreen}
+                    />
+                    {/* A bottom sheet over the page, like YouTube's on phones; tapping above it closes it. It lives on the body,
+                        since the watch page's container query would otherwise confine a fixed element, or in the fullscreen player. */}
+                    {menuOpen && menu && createPortal(
+                        <div className='tb-app tb-sheet'>
+                            <div className='tb-sheet__scrim' />
+                            <div ref={menuRef} className='tb-sheet__panel'>{menu}</div>
+                        </div>,
+                        (fullscreen && rootRef.current) || document.body
                     )}
-                </div>
+                </>
+            ) : (
+                <div className='tb-player__chrome'>
+                    {scrubber}
 
-                <div className='tb-controls'>
-                    <button className='tb-ctl' aria-label={playing ? 'Pause (k)' : 'Play (k)'} onClick={togglePlay}>
-                        <Icon name={playing ? 'pause' : 'play'} filled />
-                    </button>
-                    {onNext && (
-                        <button className='tb-ctl' aria-label='Next (Shift+N)' onClick={onNext}>
-                            <Icon name='next' filled />
+                    <div className='tb-controls'>
+                        <button className='tb-ctl' aria-label={playing ? 'Pause (k)' : 'Play (k)'} onClick={togglePlay}>
+                            <Icon name={playing ? 'pause' : 'play'} filled />
                         </button>
-                    )}
-                    <div className='tb-volume'>
-                        <button className='tb-ctl' aria-label={isMuted ? globalize.translate('Unmute') : globalize.translate('Mute')} onClick={toggleMute}>
-                            <Icon name={isMuted ? 'mute' : 'volume'} />
-                        </button>
-                        <input
-                            className='tb-volume__slider'
-                            type='range'
-                            min={0}
-                            max={1}
-                            step={0.01}
-                            value={isMuted ? 0 : Number(volume)}
-                            // Paints the track up to the current level
-                            style={{ '--fill': `${(isMuted ? 0 : Number(volume)) * 100}%` } as CSSProperties}
-                            aria-label='Volume'
-                            onChange={e => {
-                                setVolume(e.target.value);
-                                if (Number(e.target.value) > 0) setMuted('false');
-                            }}
-                        />
-                    </div>
-                    <span className='tb-time'>{formatClock(time)} / {formatClock(duration)}</span>
-                    <span className='tb-controls__spacer' />
-                    {!!source?.subtitles.length && (
-                        <button
-                            className={classNames('tb-ctl', { 'is-on': subtitle >= 0 })}
-                            aria-label={`${globalize.translate('Subtitles')} (c)`}
-                            aria-pressed={subtitle >= 0}
-                            onClick={toggleSubtitles}
-                        >
-                            <Icon name='cc' />
-                        </button>
-                    )}
-                    {source && (
-                        <div ref={menuRef} className='tb-player__menu-anchor'>
-                            <button
-                                className={classNames('tb-ctl', { 'is-on': menuOpen })}
-                                aria-label='Settings'
-                                aria-haspopup='menu'
-                                aria-expanded={menuOpen}
-                                onClick={() => setMenuOpen(o => !o)}
-                            >
-                                <Icon name='gear' />
+                        {onNext && (
+                            <button className='tb-ctl' aria-label='Next (Shift+N)' onClick={onNext}>
+                                <Icon name='next' filled />
                             </button>
-                            {menuOpen && (
-                                <div className='tb-player__menu' role='menu'>
-                                    {source.audioTracks.length > 1 && (
-                                        <section className='tb-player__menu-group'>
-                                            <h4>Audio</h4>
-                                            {source.audioTracks.map(track => (
-                                                <button
-                                                    key={track.index}
-                                                    className='tb-player__menu-item'
-                                                    role='menuitemradio'
-                                                    aria-checked={track.index === source.audioStreamIndex}
-                                                    onClick={() => chooseAudio(track.index)}
-                                                >
-                                                    {track.label}
-                                                </button>
-                                            ))}
-                                        </section>
-                                    )}
-                                    {source.subtitles.length > 0 && (
-                                        <section className='tb-player__menu-group'>
-                                            <h4>{globalize.translate('Subtitles')}</h4>
-                                            <button className='tb-player__menu-item' role='menuitemradio' aria-checked={subtitle < 0} onClick={() => pickSubtitle(-1)}>Off</button>
-                                            {source.subtitles.map((track, i) => (
-                                                <button key={track.index} className='tb-player__menu-item' role='menuitemradio' aria-checked={subtitle === i} onClick={() => pickSubtitle(i)}>
-                                                    {track.label}
-                                                </button>
-                                            ))}
-                                        </section>
-                                    )}
-                                    <section className='tb-player__menu-group'>
-                                        <h4>Speed</h4>
-                                        <div className='tb-player__speeds'>
-                                            {SPEEDS.map(rate => (
-                                                <button
-                                                    key={rate}
-                                                    className='tb-player__menu-item'
-                                                    role='menuitemradio'
-                                                    aria-checked={Number(speed) === rate}
-                                                    onClick={() => setSpeed(String(rate))}
-                                                >
-                                                    {rate === 1 ? 'Normal' : `${rate}x`}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </section>
-                                </div>
-                            )}
+                        )}
+                        <div className='tb-volume'>
+                            <button className='tb-ctl' aria-label={isMuted ? globalize.translate('Unmute') : globalize.translate('Mute')} onClick={toggleMute}>
+                                <Icon name={isMuted ? 'mute' : 'volume'} />
+                            </button>
+                            <input
+                                className='tb-volume__slider'
+                                type='range'
+                                min={0}
+                                max={1}
+                                step={0.01}
+                                value={isMuted ? 0 : Number(volume)}
+                                // Paints the track up to the current level
+                                style={{ '--fill': `${(isMuted ? 0 : Number(volume)) * 100}%` } as CSSProperties}
+                                aria-label='Volume'
+                                onChange={e => {
+                                    setVolume(e.target.value);
+                                    if (Number(e.target.value) > 0) setMuted('false');
+                                }}
+                            />
                         </div>
-                    )}
-                    {canPip && (
-                        <button className={classNames('tb-ctl', { 'is-on': pip })} aria-label='Picture in picture (i)' aria-pressed={pip} onClick={togglePip}>
-                            <Icon name='pip' />
+                        <span className='tb-time'>{formatClock(time)} / {formatClock(duration)}</span>
+                        <span className='tb-controls__spacer' />
+                        {!!source?.subtitles.length && (
+                            <button
+                                className={classNames('tb-ctl', { 'is-on': subtitle >= 0 })}
+                                aria-label={`${globalize.translate('Subtitles')} (c)`}
+                                aria-pressed={subtitle >= 0}
+                                onClick={toggleSubtitles}
+                            >
+                                <Icon name='cc' />
+                            </button>
+                        )}
+                        {source && (
+                            <div ref={menuRef} className='tb-player__menu-anchor'>
+                                <button
+                                    className={classNames('tb-ctl', { 'is-on': menuOpen })}
+                                    aria-label='Settings'
+                                    aria-haspopup='menu'
+                                    aria-expanded={menuOpen}
+                                    onClick={() => setMenuOpen(o => !o)}
+                                >
+                                    <Icon name='gear' />
+                                </button>
+                                {menuOpen && menu}
+                            </div>
+                        )}
+                        {canPip && (
+                            <button className={classNames('tb-ctl', { 'is-on': pip })} aria-label='Picture in picture (i)' aria-pressed={pip} onClick={togglePip}>
+                                <Icon name='pip' />
+                            </button>
+                        )}
+                        {!fullscreen && (
+                            <button className='tb-ctl' aria-label={theater ? 'Default view (t)' : 'Theater mode (t)'} onClick={onToggleTheater}>
+                                <Icon name='theater' />
+                            </button>
+                        )}
+                        <button className='tb-ctl' aria-label={`${globalize.translate('ButtonFullscreen')} (f)`} onClick={toggleFullscreen}>
+                            <Icon name={fullscreen ? 'exitFullscreen' : 'fullscreen'} />
                         </button>
-                    )}
-                    {!fullscreen && (
-                        <button className='tb-ctl' aria-label={theater ? 'Default view (t)' : 'Theater mode (t)'} onClick={onToggleTheater}>
-                            <Icon name='theater' />
-                        </button>
-                    )}
-                    <button className='tb-ctl' aria-label={`${globalize.translate('ButtonFullscreen')} (f)`} onClick={toggleFullscreen}>
-                        <Icon name={fullscreen ? 'exitFullscreen' : 'fullscreen'} />
-                    </button>
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };

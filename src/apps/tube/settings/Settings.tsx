@@ -17,12 +17,14 @@ import { CURRENT_USER_KEY, useCurrentUser } from '../api';
 import { Section, Setting, useSavedFlash } from '../components/Form';
 import { uploadImage } from '../utils';
 import { useDocumentTitle } from '../hooks';
+import WatchSessions from './WatchSessions';
 
 import '../forms.scss';
 
 const SECTIONS = [
     { id: 'account', label: () => globalize.translate('Profile') },
     { id: 'playback', label: () => 'Playback' },
+    { id: 'sessions', label: () => 'Watch sessions' },
     { id: 'quickconnect', label: () => globalize.translate('QuickConnect') }
 ];
 
@@ -290,6 +292,7 @@ const Settings: FC = () => {
                 <div className='tb-settings__content'>
                     <Account />
                     <Playback />
+                    <WatchSessions />
                     <QuickConnect />
                 </div>
             </div>
