@@ -960,12 +960,19 @@ html {
     display: flex;
     align-items: flex-start;
     gap: 4px;
+    margin-top: 12px;
 
+    .tb-watch__title {
+        margin: 0;
+    }
+
+    /* As tall as one title line, so it centres on the first line however the title wraps */
     .tb-watch__rename {
         flex-shrink: 0;
         width: 36px;
-        height: 36px;
-        margin-top: 8px;
+        height: 28px;
+        margin: 0;
+        padding: 0;
         opacity: 0.7;
 
         svg {
@@ -1548,6 +1555,10 @@ html {
     .tb-watch__title {
         font-size: 17px;
         line-height: 24px;
+    }
+
+    .tb-watch__heading .tb-watch__rename {
+        height: 24px;
     }
 
     .tb-player {
