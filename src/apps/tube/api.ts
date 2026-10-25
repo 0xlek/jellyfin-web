@@ -13,7 +13,9 @@ import { getShowApi } from '@jellyfin/sdk/lib/utils/api/show-api';
 import { getSystemApi } from '@jellyfin/sdk/lib/utils/api/system-api';
 import { getUserApi } from '@jellyfin/sdk/lib/utils/api/user-api';
 import { getUserDataApi } from '@jellyfin/sdk/lib/utils/api/user-data-api';
+import { OutboundWebSocketMessageType } from '@jellyfin/sdk/lib/websocket';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
 import { useApi } from 'hooks/useApi';
 
@@ -440,4 +442,32 @@ export const useDeleteWatchSession = () => {
         },
         onSettled: () => queryClient.invalidateQueries({ queryKey: WATCH_SESSIONS_KEY })
     });
+};
+
+const LIVE_REFRESH_MS = 2000;
+
+/**
+ * Keeps every open list current as the server's library changes: a file dropped into a library shows up on screen
+ * without a reload. A scan reports changes in bursts, so refreshes happen at most every couple of seconds.
+ */
+export const useLiveLibrary = () => {
+    const { api } = useApi();
+    const queryClient = useQueryClient();
+    useEffect(() => {
+        let timer: number | undefined;
+        let last = 0;
+        const refresh = () => {
+            timer = undefined;
+            last = Date.now();
+            void queryClient.invalidateQueries({ queryKey: [ TUBE_KEY ] });
+        };
+        const unsubscribe = api?.subscribe([ OutboundWebSocketMessageType.LibraryChanged ], () => {
+            if (timer !== undefined) return;
+            timer = window.setTimeout(refresh, Math.max(0, last + LIVE_REFRESH_MS - Date.now()));
+        });
+        return () => {
+            unsubscribe?.();
+            window.clearTimeout(timer);
+        };
+    }, [ api, queryClient ]);
 };

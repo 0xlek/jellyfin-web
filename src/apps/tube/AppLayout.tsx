@@ -8,6 +8,7 @@ import AdminNav from './admin/AdminNav';
 import { useApi } from 'hooks/useApi';
 
 import { ADMIN_PAGE_LOADERS } from './admin/routes';
+import { useLiveLibrary } from './api';
 import { useStoredState, whenIdle } from './hooks';
 import { USER_PAGE_LOADERS } from './routes';
 
@@ -28,6 +29,7 @@ export const Component = () => {
 
     const { user } = useApi();
     const canAdmin = !!user?.Policy?.IsAdministrator;
+    useLiveLibrary();
 
     useEffect(() => setDrawerOpen(false), [ location.pathname, location.search ]);
 
