@@ -7,7 +7,9 @@ import { MediaType } from '@jellyfin/sdk/lib/generated-client/models/media-type'
 import { ItemSortBy } from '@jellyfin/sdk/lib/generated-client/models/item-sort-by';
 import { SortOrder } from '@jellyfin/sdk/lib/generated-client/models/sort-order';
 import type { LibraryApiGetItemsRequest } from '@jellyfin/sdk/lib/generated-client/api/library-api';
+import { MetadataField } from '@jellyfin/sdk/lib/generated-client/models/metadata-field';
 import { getGenreApi } from '@jellyfin/sdk/lib/utils/api/genre-api';
+import { getItemUpdateApi } from '@jellyfin/sdk/lib/utils/api/item-update-api';
 import { getLibraryApi } from '@jellyfin/sdk/lib/utils/api/library-api';
 import { getShowApi } from '@jellyfin/sdk/lib/utils/api/show-api';
 import { getSystemApi } from '@jellyfin/sdk/lib/utils/api/system-api';
@@ -470,4 +472,34 @@ export const useLiveLibrary = () => {
             window.clearTimeout(timer);
         };
     }, [ api, queryClient ]);
+};
+
+/** The file name without folders or extension: what the server names an item that has no name of its own. */
+export const fileTitle = (path?: string | null) => (path ?? '').split(/[\\/]/).pop()?.replace(/\.[^.]+$/, '') ?? '';
+
+/**
+ * Renames an item for display only: the file on disk keeps its name, and the item, with its watch sessions and user
+ * data, keeps its identity. The name is locked so scans leave it alone; an empty name goes back to the file's.
+ * The server applies every field it is sent, so the full item goes back with only the name changed.
+ */
+export const useRenameItem = () => {
+    const { api, user } = useApi();
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ itemId, name }: { itemId: string, name: string }) => {
+            const { data } = await getLibraryApi(api!).getItems({ userId: user?.Id, ids: [ itemId ], fields: Object.values(ItemFields) });
+            const full = data.Items?.[0];
+            if (!full) throw new Error(`Item ${itemId} not found`);
+            const trimmed = name.trim();
+            const locked = new Set(full.LockedFields ?? []);
+            if (trimmed) locked.add(MetadataField.Name);
+            else locked.delete(MetadataField.Name);
+            await getItemUpdateApi(api!).updateItem({
+                itemId,
+                // Trickplay is read-only and older servers fail to read it back
+                baseItemDto: { ...full, Trickplay: undefined, Name: trimmed || fileTitle(full.Path) || full.Name, LockedFields: [ ...locked ] }
+            });
+        },
+        onSettled: () => queryClient.invalidateQueries({ queryKey: [ TUBE_KEY ] })
+    });
 };

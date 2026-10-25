@@ -1,5 +1,7 @@
 import { type RefObject, useEffect, useState } from 'react';
 
+import { useServerName } from './api';
+
 /** Calls onDismiss on Escape or a pointer press outside ref while active. */
 export const useDismiss = (ref: RefObject<HTMLElement>, active: boolean, onDismiss: () => void) => {
     useEffect(() => {
@@ -73,11 +75,12 @@ export const isTyping = (e: KeyboardEvent) => {
     return target.isContentEditable || [ 'TEXTAREA', 'SELECT' ].includes(target.tagName);
 };
 
-/** Sets the tab title for the current page. */
+/** Sets the tab title for the current page, after the server's name like the top bar's logo. */
 export const useDocumentTitle = (title?: string | null) => {
+    const app = useServerName() || 'Videos';
     useEffect(() => {
-        document.title = title ? `${title} · Jellyfin` : 'Jellyfin';
-    }, [ title ]);
+        document.title = title ? `${title} · ${app}` : app;
+    }, [ title, app ]);
 };
 
 /** Runs fn once the browser is idle (or after a short delay where idle callbacks are missing); returns a cancel function. */

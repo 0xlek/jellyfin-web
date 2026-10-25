@@ -10,18 +10,19 @@
     <meta http-equiv="X-UA-Compatibility" content="IE=Edge">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="Jellyfin">
+    <meta name="application-name" content="Videos">
     <meta name="robots" content="noindex, nofollow, noarchive">
     <meta name="referrer" content="no-referrer">
 
     <meta id="themeColor" name="theme-color" content="#202020">
 
-    <link rel="apple-touch-icon" sizes="180x180" href="../node_modules/@jellyfin/ux-web/favicons/touchicon.png">
-    <link rel="shortcut icon" href="../node_modules/@jellyfin/ux-web/favicons/favicon.ico">
-    <meta name="msapplication-TileImage" content="../node_modules/@jellyfin/ux-web/favicons/touchicon144.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/favicons/touchicon180.png">
+    <link rel="icon" type="image/svg+xml" href="assets/favicons/logo.svg">
+    <link rel="alternate icon" href="assets/favicons/favicon.ico">
+    <meta name="msapplication-TileImage" content="assets/favicons/touchicon144.png">
     <meta name="msapplication-TileColor" content="#333333">
 
-    <title>Jellyfin</title>
+    <title>Videos</title>
 
     <style>
         .transparentDocument,
@@ -52,6 +53,22 @@
         .screensaver-noScroll.mouseIdle a,
         .screensaver-noScroll.mouseIdle label {
             cursor: none !important;
+        }
+
+        /* The app's mark while the code loads; inline so it shows before any stylesheet arrives */
+        .splashLogo {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 72px;
+            height: 72px;
+            margin: -36px 0 0 -36px;
+            background: url(assets/favicons/logo.svg) center / contain no-repeat;
+            animation: splashIn 0.4s ease-out;
+        }
+
+        @keyframes splashIn {
+            from { opacity: 0; transform: scale(0.9); }
         }
 
         html {

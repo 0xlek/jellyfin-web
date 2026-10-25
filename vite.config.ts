@@ -9,7 +9,6 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 import packageJson from './package.json';
 
 const SRC = path.resolve(__dirname, 'src');
-const NODE_MODULES = path.resolve(__dirname, 'node_modules');
 
 /** Files served as-is from the libraries folder, mostly workers that are loaded by URL at runtime. */
 /** Themes are built as standalone stylesheets (themes/<id>/theme.css) that the app swaps with a <link>. */
@@ -102,12 +101,7 @@ export default defineConfig(({ command, mode }) => {
                     // The service worker is a small standalone script, registered by URL
                     targets: [ 'assets', 'config.json', 'robots.txt', 'manifest.json' ]
                         .map(file => ({ src: normalizePath(path.join(SRC, file)), dest: '.' }))
-                }).filter(plugin => plugin.apply !== 'serve'),
-                viteStaticCopy({
-                    targets: [
-                        { src: normalizePath(path.join(NODE_MODULES, '@jellyfin/ux-web/favicons/touchicon*.png')), dest: 'favicons', rename: { stripBase: true } }
-                    ]
-                })
+                }).filter(plugin => plugin.apply !== 'serve')
             ])
         ],
         css: {

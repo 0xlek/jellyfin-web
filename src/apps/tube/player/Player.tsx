@@ -428,7 +428,8 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, ownSeconds, o
 
     useEffect(() => () => window.clearTimeout(idleTimer.current), []);
 
-    // YouTube's keyboard shortcuts. Arrow keys and space only act while the player has focus so they keep scrolling the page.
+    // YouTube's keyboard shortcuts, wherever focus is unless typing. Up and down only act while the player has focus
+    // so they keep scrolling the page.
     useEffect(() => {
         const nudgeVolume = (delta: number) => setVolume(v => String(Math.min(1, Math.max(0, Number(v) + delta))));
         const anywhere: Record<string, () => void> = {
@@ -439,12 +440,17 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, ownSeconds, o
             m: toggleMute,
             t: onToggleTheater,
             c: toggleSubtitles,
-            i: togglePip
+            i: togglePip,
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            ' ': () => {
+                // A focused button would also act on the key's release, clicking whatever was last pressed
+                if (document.activeElement instanceof HTMLButtonElement) document.activeElement.blur();
+                togglePlay();
+            },
+            arrowleft: () => seekBy(-5),
+            arrowright: () => seekBy(5)
         };
         const whenFocused: Record<string, () => void> = {
-            ' ': togglePlay,
-            arrowleft: () => seekBy(-5),
-            arrowright: () => seekBy(5),
             arrowup: () => nudgeVolume(0.05),
             arrowdown: () => nudgeVolume(-0.05)
         };
@@ -460,7 +466,7 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, ownSeconds, o
         };
 
         const onKey = (e: KeyboardEvent) => {
-            if (isTyping(e) || e.ctrlKey || e.metaKey || e.altKey) return;
+            if (isTyping(e) || e.ctrlKey || e.metaKey || e.altKey || (e.key === ' ' && e.repeat)) return;
             const action = actionFor(e);
             if (!action) return;
             e.preventDefault();
@@ -470,6 +476,43 @@ const Player: FC<PlayerProps> = ({ item, trackGroup, startSeconds, ownSeconds, o
         document.addEventListener('keydown', onKey);
         return () => document.removeEventListener('keydown', onKey);
     }, [ togglePlay, seekBy, seekTo, toggleFullscreen, toggleMute, onToggleTheater, onNext, setVolume, wake, toggleSubtitles, togglePip, stepSpeed ]);
+
+    // The system's media controls: the keyboard's play, previous and next keys, headphones, Control Center
+    useEffect(() => {
+        if (!('mediaSession' in navigator)) return;
+        const session = navigator.mediaSession;
+        const artwork = thumbUrl(api, item, 640);
+        session.metadata = new MediaMetadata({
+            title: item.Name ?? '',
+            artist: channelName(item) ?? '',
+            artwork: artwork ? [ { src: artwork, sizes: '640x360', type: 'image/jpeg' } ] : []
+        });
+        const handlers: [ MediaSessionAction, MediaSessionActionHandler ][] = [
+            [ 'play', () => {
+                videoRef.current?.play().catch(() => undefined);
+            } ],
+            [ 'pause', () => videoRef.current?.pause() ],
+            // Like YouTube: back to the start first, the previous video only from the first seconds
+            [ 'previoustrack', () => ((videoRef.current?.currentTime ?? 0) > 3 || !onPrevious ? seekTo(0) : onPrevious()) ],
+            [ 'seekbackward', d => seekBy(-(d.seekOffset ?? 10)) ],
+            [ 'seekforward', d => seekBy(d.seekOffset ?? 10) ],
+            [ 'seekto', d => d.seekTime !== undefined && seekTo(d.seekTime) ]
+        ];
+        if (onNext) handlers.push([ 'nexttrack', onNext ]);
+        const set = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
+            try {
+                session.setActionHandler(action, handler);
+            } catch {
+                // Browsers reject actions they do not know
+            }
+        };
+        for (const [ action, handler ] of handlers) set(action, handler);
+        if (!onNext) set('nexttrack', null);
+        return () => {
+            for (const [ action ] of handlers) set(action, null);
+            session.metadata = null;
+        };
+    }, [ api, item, onPrevious, onNext, seekBy, seekTo ]);
 
     const fractionAt = (clientX: number) => {
         const rect = barRef.current!.getBoundingClientRect();

@@ -1,14 +1,14 @@
 import type { BaseItemDto } from '@jellyfin/sdk/lib/generated-client/models/base-item-dto';
 import { BaseItemKind } from '@jellyfin/sdk/lib/generated-client/models/base-item-kind';
 import classNames from 'classnames';
-import React, { type FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { type FC, type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 
 import Page from 'components/Page';
 import { useApi } from 'hooks/useApi';
 import globalize from 'lib/globalize';
 
-import { type CollectionInfo, useCollectionOf, useCollectionVideos, useItem, useItemWatchSessions, useToggleFavorite, useTogglePlayed, useUpNext, type WatchSession } from '../api';
+import { type CollectionInfo, fileTitle, useCollectionOf, useCollectionVideos, useItem, useItemWatchSessions, useRenameItem, useToggleFavorite, useTogglePlayed, useUpNext, type WatchSession } from '../api';
 import VideoCard from '../components/VideoCard';
 import { useDocumentTitle, useStoredState } from '../hooks';
 import Icon from '../icons';
@@ -51,6 +51,64 @@ const Description: FC<{ item: BaseItemDto }> = ({ item }) => {
                 </button>
             )}
         </div>
+    );
+};
+
+/** The title, which admins can rename for display; the file keeps its name and the video its history. */
+const Title: FC<{ item: BaseItemDto }> = ({ item }) => {
+    const { user } = useApi();
+    const rename = useRenameItem();
+    const [ editing, setEditing ] = useState(false);
+    const [ name, setName ] = useState('');
+    const canRename = !!user?.Policy?.IsAdministrator && !!item.Id;
+
+    const save = (value: string) => {
+        rename.mutate({ itemId: item.Id!, name: value }, { onSuccess: () => setEditing(false) });
+    };
+    const onSubmit = (e: FormEvent) => {
+        e.preventDefault();
+        save(name);
+    };
+
+    if (!editing) {
+        return (
+            <div className='tb-watch__heading'>
+                <h1 className='tb-watch__title'>{item.Name}</h1>
+                {canRename && (
+                    <button
+                        className='tb-ctl tb-watch__rename'
+                        aria-label='Rename'
+                        onClick={() => {
+                            setName(item.Name ?? '');
+                            setEditing(true);
+                        }}
+                    >
+                        <Icon name='edit' />
+                    </button>
+                )}
+            </div>
+        );
+    }
+
+    return (
+        <form className='tb-watch__rename-form' onSubmit={onSubmit}>
+            <input
+                className='tb-input'
+                aria-label='Name'
+                // eslint-disable-next-line jsx-a11y/no-autofocus
+                autoFocus
+                value={name}
+                placeholder={fileTitle(item.Path) || 'Name'}
+                onChange={e => setName(e.target.value)}
+                onKeyDown={e => e.key === 'Escape' && setEditing(false)}
+            />
+            <div className='tb-watch__rename-actions'>
+                <button type='submit' className='tb-pill tb-pill--primary' disabled={rename.isPending || !name.trim()}>Save</button>
+                <button type='button' className='tb-pill' disabled={rename.isPending} onClick={() => save('')}>Use file name</button>
+                <button type='button' className='tb-pill' onClick={() => setEditing(false)}>{globalize.translate('ButtonCancel')}</button>
+            </div>
+            {rename.error && <p className='tb-muted'>{(rename.error as Error).message}</p>}
+        </form>
     );
 };
 
@@ -223,7 +281,7 @@ const Watch: FC = () => {
                     {error && <p className='tb-empty'>{(error as Error).message}</p>}
                     {item && (
                         <>
-                            <h1 className='tb-watch__title'>{item.Name}</h1>
+                            <Title key={item.Id} item={item} />
                             <div className='tb-watch__bar'>
                                 {collectionOf ? <CollectionChannel info={collectionOf} /> : <Channel item={item} />}
                                 <Actions item={item} />

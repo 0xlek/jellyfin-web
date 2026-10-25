@@ -956,6 +956,56 @@ html {
     line-height: 28px;
 }
 
+.tb-watch__heading {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+
+    .tb-watch__rename {
+        flex-shrink: 0;
+        width: 36px;
+        height: 36px;
+        margin-top: 8px;
+        opacity: 0.7;
+
+        svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        &:hover {
+            opacity: 1;
+        }
+    }
+}
+
+.tb-watch__rename-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+
+    .tb-input {
+        width: 100%;
+        height: 40px;
+        padding: 0 12px;
+        border-radius: 8px;
+        background: var(--tb-surface);
+        font-size: 18px;
+        font-weight: 600;
+    }
+}
+
+.tb-watch__rename-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    .tb-pill--primary {
+        margin-top: 0;
+    }
+}
+
 .tb-watch__bar {
     display: flex;
     flex-wrap: wrap;
