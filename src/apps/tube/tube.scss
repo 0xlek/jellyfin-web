@@ -978,6 +978,7 @@ html {
 
     img,
     .tb-channel__fallback {
+        flex-shrink: 0;
         width: 40px;
         height: 40px;
         border-radius: 50%;
@@ -994,6 +995,7 @@ html {
     .tb-channel__text {
         display: flex;
         flex-direction: column;
+        min-width: 0;
     }
 
     strong {
